@@ -27,6 +27,7 @@ ALL_ADAPTERS = {
 def main():
     parser = argparse.ArgumentParser(description="Unified Repo Analysis Orchestrator")
     parser.add_argument("repo_url", help="URL of the git repository to analyze (or local path)")
+    parser.add_argument("--repo-name", help="Identifier for the report (e.g. repo URL or name) when analyzing a local path", default=None)
     parser.add_argument("--branch", help="Branch or commit to checkout", default=None)
     parser.add_argument(
         "--tools", 
@@ -61,7 +62,8 @@ def main():
         orchestrator = Orchestrator(adapters=adapters)
         
         print(f"[*] Running analysis with tools: {', '.join(tools_to_run)}")
-        report = orchestrator.analyze(args.repo_url, repo_path)
+        report_identifier = args.repo_name if args.repo_name else args.repo_url
+        report = orchestrator.analyze(report_identifier, repo_path)
         
         outputs = [o.strip() for o in args.output.split(",") if o.strip()]
         
