@@ -59,3 +59,25 @@ class NewToolAdapter(BaseAdapter):
         # Return ToolResult
         pass
 ```
+
+## GitHub Actions CI Integration
+
+This repository includes a fully configured GitHub Actions workflow (`.github/workflows/repo-analysis.yml`).
+
+### What triggers the workflow?
+- **Push events**: Any push to any branch.
+- **Pull Requests**: Creation or update of any pull request.
+- **Manual Execution**: Via the `workflow_dispatch` trigger in the GitHub Actions tab.
+
+### Where to find generated reports?
+When the workflow completes, the generated `report.json` and `report.csv` files are automatically grouped and uploaded as a GitHub Actions Artifact named **`repo-analysis-report`**. 
+You can download these artifacts from the summary page of the workflow run.
+
+### Future Enhancements
+The following features are intentionally deferred to a later phase and are not yet implemented:
+- Merge blocking / Required status checks based on findings
+- AI/LLM integration (Gemini, OpenAI, Claude) for analysis or automatic remediation
+- PR comments or inline code annotations
+- Automatic code fixes pushed back to the branch
+- JavaScript/Node adapters
+- Dashboard UI, Google Docs export, or Email notifications
