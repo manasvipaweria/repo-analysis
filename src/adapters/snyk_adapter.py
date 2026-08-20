@@ -24,6 +24,13 @@ class SnykAdapter(BaseAdapter):
                 status=ToolStatus.SKIPPED,
                 error_message="No JS/TS manifests found."
             )
+            
+        if not os.environ.get("SNYK_TOKEN"):
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="SNYK_TOKEN environment variable is not set. Snyk requires authentication."
+            )
 
         with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as tmp_file:
             json_output_path = tmp_file.name

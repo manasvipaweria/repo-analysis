@@ -7,7 +7,11 @@ on:
         description: 'Comma-separated list of tools to run'
         required: false
         type: string
-        default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter'
+        default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor'
+    secrets:
+      SNYK_TOKEN:
+        description: 'Snyk API Token'
+        required: false
 
 jobs:
   analyze:
@@ -30,14 +34,23 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
           
-      - name: Install orchestrator dependencies
+      - name: Install orchestrator and CLI dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r orchestrator-repo/requirements.txt
+          pip install owasp-depscan
+          npm install -g snyk @cyclonedx/cdxgen dependency-cruiser react-doctor
           
       - name: Run Repo Analysis Orchestrator
         id: analyze
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
           cd target-repo
           rm -f report.json report.csv

@@ -11,9 +11,10 @@ def test_snyk_adapter_skipped_no_js(tmp_path):
     assert result.status == ToolStatus.SKIPPED
     assert "No JS/TS" in result.error_message
 
-def test_snyk_adapter_success_no_vulns(tmp_path):
+def test_snyk_adapter_success_no_vulns(tmp_path, monkeypatch):
     # Setup dummy JS project
     (tmp_path / "package.json").write_text("{}")
+    monkeypatch.setenv("SNYK_TOKEN", "dummy")
     
     adapter = SnykAdapter()
     with patch('subprocess.run') as mock_run:
@@ -37,8 +38,9 @@ def test_snyk_adapter_success_no_vulns(tmp_path):
         assert result.status == ToolStatus.COMPLETED
         assert len(result.findings) == 0
 
-def test_snyk_adapter_success_with_vulns(tmp_path):
+def test_snyk_adapter_success_with_vulns(tmp_path, monkeypatch):
     (tmp_path / "package.json").write_text("{}")
+    monkeypatch.setenv("SNYK_TOKEN", "dummy")
     
     adapter = SnykAdapter()
     with patch('subprocess.run') as mock_run:
@@ -80,8 +82,9 @@ def test_snyk_adapter_success_with_vulns(tmp_path):
         assert finding.rule_id == "CVE-2019-10744"
         assert "Prototype Pollution" in finding.message
         
-def test_snyk_adapter_execution_error(tmp_path):
+def test_snyk_adapter_execution_error(tmp_path, monkeypatch):
     (tmp_path / "package.json").write_text("{}")
+    monkeypatch.setenv("SNYK_TOKEN", "dummy")
     
     adapter = SnykAdapter()
     with patch('subprocess.run') as mock_run:
