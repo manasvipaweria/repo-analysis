@@ -40,6 +40,7 @@ jobs:
         id: analyze
         run: |
           cd target-repo
+          rm -f report.json report.csv
           python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --output json,csv
         
       - name: Upload analysis reports
@@ -50,4 +51,4 @@ jobs:
           path: |
             target-repo/report.json
             target-repo/report.csv
-          if-no-files-found: warn
+          if-no-files-found: error
