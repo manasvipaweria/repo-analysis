@@ -1,7 +1,7 @@
 import datetime
 from typing import List, Dict
 
-from .models import Report, Finding, ToolResult, ToolStatus, CategoryStatus, CategorySummary
+from .models import Report, Finding, ToolResult, ToolStatus, CategoryStatus, CategorySummary, Category
 from .dedup import deduplicate_findings
 from src.adapters.base import BaseAdapter
 
@@ -38,6 +38,7 @@ class Orchestrator:
                 all_findings.extend(result.findings)
                 
         deduped_findings = deduplicate_findings(all_findings)
+        self.enrich_findings(deduped_findings, repo_path)
         
         # Build category summaries
         summary: Dict[str, CategorySummary] = {}
@@ -90,3 +91,36 @@ class Orchestrator:
             findings=deduped_findings
         )
         return report
+
+    def enrich_findings(self, findings: List[Finding], repo_path: str):
+        import os
+        for f in findings:
+            # Code Context
+            if f.file and f.line > 0:
+                abs_path = os.path.join(repo_path, f.file)
+                if os.path.isfile(abs_path):
+                    try:
+                        with open(abs_path, 'r', encoding='utf-8', errors='replace') as file_obj:
+                            lines = file_obj.readlines()
+                            start = max(0, f.line - 3)
+                            end = min(len(lines), f.line + 2)
+                            f.code_context = "".join(lines[start:end])
+                    except Exception:
+                        pass
+            
+            # Priority & Merge Blocking logic
+            severity = f.severity.lower()
+            if severity in ("critical", "high"):
+                f.priority = "P1"
+                f.merge_blocking = True
+            elif severity == "medium":
+                f.priority = "P2"
+                f.merge_blocking = False
+            else:
+                f.priority = "P3"
+                f.merge_blocking = False
+                
+            # Exceptions for certain categories
+            if f.category == Category.SECURITY.value and f.priority == "P2":
+                # Escalate medium security issues
+                f.merge_blocking = True

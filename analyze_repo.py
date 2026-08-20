@@ -13,6 +13,10 @@ from src.adapters.pip_audit_adapter import PipAuditAdapter
 from src.adapters.mypy_adapter import MypyAdapter
 from src.adapters.pytest_adapter import PytestAdapter
 from src.adapters.import_linter_adapter import ImportLinterAdapter
+from src.adapters.snyk_adapter import SnykAdapter
+from src.adapters.depscan_adapter import DepScanAdapter
+from src.adapters.depcruise_adapter import DepcruiseAdapter
+from src.adapters.sonarqube_adapter import SonarQubeAdapter
 
 ALL_ADAPTERS = {
     "ruff": RuffAdapter(),
@@ -21,7 +25,11 @@ ALL_ADAPTERS = {
     "pip-audit": PipAuditAdapter(),
     "mypy": MypyAdapter(),
     "pytest": PytestAdapter(),
-    "import-linter": ImportLinterAdapter()
+    "import-linter": ImportLinterAdapter(),
+    "snyk": SnykAdapter(),
+    "dep-scan": DepScanAdapter(),
+    "dependency-cruiser": DepcruiseAdapter(),
+    "sonarqube": SonarQubeAdapter()
 }
 
 def main():

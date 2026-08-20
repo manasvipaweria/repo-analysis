@@ -30,6 +30,13 @@ def is_duplicate(f1: Finding, f2: Finding) -> bool:
     if f1.rule_id in f2.rule_id or f2.rule_id in f1.rule_id:
         return True
         
+    # If both look like explicit vulnerability identifiers (CVE, GHSA, etc.)
+    # and they didn't match above, they are definitely distinct vulnerabilities.
+    is_vuln1 = f1.rule_id.startswith("CVE-") or f1.rule_id.startswith("GHSA-")
+    is_vuln2 = f2.rule_id.startswith("CVE-") or f2.rule_id.startswith("GHSA-")
+    if is_vuln1 and is_vuln2:
+        return False
+        
     # Heuristic: message similarity
     words1 = extract_words(f1.message)
     words2 = extract_words(f2.message)

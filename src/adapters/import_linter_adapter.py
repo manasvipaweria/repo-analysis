@@ -1,9 +1,11 @@
 import subprocess
 import os
+import json
 from typing import List
 
 from src.core.models import ToolResult, ToolStatus, Finding, Category
 from src.adapters.base import BaseAdapter
+from src.utils.project import has_python_files
 
 class ImportLinterAdapter(BaseAdapter):
     @property
@@ -15,6 +17,13 @@ class ImportLinterAdapter(BaseAdapter):
         return [Category.ARCHITECTURE.value]
 
     def run(self, repo_path: str) -> ToolResult:
+        if not has_python_files(repo_path):
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="No Python files found."
+            )
+
         try:
             # Check for config file loosely
             has_config = False

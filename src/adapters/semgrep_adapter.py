@@ -5,6 +5,7 @@ from typing import List
 
 from src.core.models import ToolResult, ToolStatus, Finding, Category
 from src.adapters.base import BaseAdapter
+from src.utils.project import has_python_files, has_js_ts_files
 
 class SemgrepAdapter(BaseAdapter):
     @property
@@ -16,6 +17,13 @@ class SemgrepAdapter(BaseAdapter):
         return [Category.SECURITY.value]
 
     def run(self, repo_path: str) -> ToolResult:
+        if not (has_python_files(repo_path) or has_js_ts_files(repo_path)):
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="No supported languages (Python, JS/TS) found in repository."
+            )
+            
         try:
             result = subprocess.run(
                 ["semgrep", "scan", "--config=auto", "--json", "."],
@@ -39,6 +47,7 @@ class SemgrepAdapter(BaseAdapter):
             findings = []
             for item in output_data.get('results', []):
                 filename = os.path.relpath(item.get('path', ''), repo_path)
+                # Ensure filename does not start with .. if it resolved outside some bounds, though it shouldn't
                 
                 findings.append(Finding(
                     category=Category.SECURITY.value,

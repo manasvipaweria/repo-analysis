@@ -88,7 +88,10 @@ def test_csv_summary_generation(tmp_path):
     content = csv_file.read_text(encoding="utf-8")
     assert "SUMMARY,sec,PASSED,0" in content
     assert "SUMMARY,qual,ISSUES_FOUND,1" in content
-    assert "FINDING,qual,low,b,2,r,m,t2" in content
+    assert "FINDING," in content
+    assert ",qual," in content
+    assert ",low," in content
+    assert ",b,2,r,m," in content
 
 import sys
 import subprocess

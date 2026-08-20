@@ -5,6 +5,7 @@ from typing import List
 
 from src.core.models import ToolResult, ToolStatus, Finding, Category, TestMetrics
 from src.adapters.base import BaseAdapter
+from src.utils.project import has_python_files
 
 class PytestAdapter(BaseAdapter):
     @property
@@ -16,6 +17,13 @@ class PytestAdapter(BaseAdapter):
         return [Category.TESTING.value]
 
     def run(self, repo_path: str) -> ToolResult:
+        if not has_python_files(repo_path):
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="No Python files found."
+            )
+
         report_xml = os.path.join(repo_path, "pytest_report.xml")
         cov_xml = os.path.join(repo_path, "coverage.xml")
         

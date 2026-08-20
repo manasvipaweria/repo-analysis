@@ -25,16 +25,24 @@ def write_csv_report(report: Report, filepath: str) -> None:
         writer.writerow([]) # blank line
         
         # Write findings section
-        writer.writerow(["Type", "Category", "Severity", "File", "Line", "Rule ID", "Message", "Detected By"])
+        writer.writerow([
+            "Type", "Finding ID", "Category", "Priority", "Severity", 
+            "Merge Blocking", "File", "Line", "Rule ID", "Message", 
+            "Code Context", "Detected By"
+        ])
         for finding in report.findings:
             detected_by_str = ", ".join(finding.detected_by)
             writer.writerow([
                 "FINDING",
+                finding.finding_id,
                 finding.category,
+                finding.priority,
                 finding.severity,
+                finding.merge_blocking,
                 finding.file,
                 finding.line,
                 finding.rule_id,
                 finding.message,
+                finding.code_context or "",
                 detected_by_str
             ])

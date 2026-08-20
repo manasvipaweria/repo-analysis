@@ -31,6 +31,16 @@ class CategoryStatus(str, Enum):
     SKIPPED = "SKIPPED"
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
+import uuid
+
+@dataclass
+class AIFutureFields:
+    # Kept separate to ensure tool-generated data is distinct from future AI outputs.
+    # Do not add AI integration yet, just the structure.
+    analysis_summary: Optional[str] = None
+    remediation_suggestion: Optional[str] = None
+    is_false_positive_prediction: Optional[bool] = None
+
 @dataclass
 class Finding:
     category: str
@@ -41,6 +51,14 @@ class Finding:
     rule_id: str
     detected_by: List[str] = field(default_factory=list)
     confidence: Optional[str] = None
+    
+    # V2 Fields
+    finding_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    priority: str = "medium"
+    code_context: Optional[str] = None
+    merge_blocking: bool = False
+    
+    ai_fields: Optional[AIFutureFields] = None
 
 @dataclass
 class TestMetrics:

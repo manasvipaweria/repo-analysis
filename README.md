@@ -10,14 +10,37 @@ A unified Python orchestrator that runs code analysis, security, quality, and te
 - Explicitly handles tool statuses (`COMPLETED`, `SKIPPED`, `ERROR`) to ensure `PASSED` means 100% clean.
 - Outputs detailed JSON and summary-inclusive CSV reports.
 
+## Supported Tools
+
+### Python Ecosystem
+- **Ruff**: Linting and code quality
+- **Bandit**: Security analysis (SAST)
+- **Pip-audit**: Dependency vulnerabilities
+- **Mypy**: Static type checking
+- **Pytest**: Unit testing and coverage
+- **Import-Linter**: Architecture and dependency rules
+- **Semgrep**: Advanced SAST across languages
+
+### JS/TS/Node Ecosystem
+- **Snyk Open Source**: Dependency vulnerabilities. Requires `snyk` CLI installed and authenticated (`snyk auth`). Handles multiple package manifests.
+- **OWASP dep-scan**: Dependency vulnerabilities mapping to CVEs/GHSAs.
+- **Dependency-Cruiser**: Architecture and forbidden dependency analysis. Requires `.dependency-cruiser.js` configuration.
+- **SonarQube Community**: Code quality and SAST. Requires `sonar-scanner` and `sonar-project.properties` (or `SONAR_HOST_URL` env var).
+- **Semgrep**: Advanced SAST across languages.
+
+*Note: The orchestrator automatically detects the ecosystem based on files (e.g. `package.json`, `.py`) and gracefully skips tools that are not applicable to the repository.*
+
 ## Setup
 
-1. Install requirements:
+1. Install Python requirements:
    ```bash
    pip install -r requirements.txt
    ```
 
-2. Make sure the tools you intend to use are available in your `PATH` or virtual environment. The orchestrator gracefully handles missing tools by marking them as `ERROR`.
+2. Make sure the tools you intend to use are available in your `PATH`.
+   - JS tools can be installed globally via npm (e.g. `npm install -g snyk @owasp/dep-scan dependency-cruiser`).
+   - SonarQube requires the `sonar-scanner` executable.
+   - Snyk requires authentication via `snyk auth`.
 
 ## Usage
 
@@ -30,7 +53,7 @@ python analyze_repo.py https://github.com/user/repo
 ### Options
 
 - `--branch main` : Analyze a specific branch.
-- `--tools ruff,bandit,pytest` : Selectively run a subset of tools.
+- `--tools ruff,bandit,pytest,snyk` : Selectively run a subset of tools.
 - `--output json,csv` : Select output formats.
 
 ## Adding a New Tool Adapter
@@ -97,4 +120,3 @@ The following features are intentionally deferred to a later phase and are not y
 - AI/LLM integration (Gemini, OpenAI, Claude) for analysis or automatic remediation
 - PR comments or inline code annotations
 - Automatic code fixes pushed back to the branch
-- JavaScript/Node adapters

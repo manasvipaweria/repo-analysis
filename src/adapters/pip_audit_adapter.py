@@ -5,6 +5,7 @@ from typing import List
 
 from src.core.models import ToolResult, ToolStatus, Finding, Category
 from src.adapters.base import BaseAdapter
+from src.utils.project import has_python_files
 
 class PipAuditAdapter(BaseAdapter):
     @property
@@ -16,6 +17,13 @@ class PipAuditAdapter(BaseAdapter):
         return [Category.DEPENDENCIES.value]
 
     def run(self, repo_path: str) -> ToolResult:
+        if not has_python_files(repo_path):
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="No Python files found."
+            )
+            
         try:
             cmd = ["pip-audit", "-f", "json"]
             req_file = os.path.join(repo_path, 'requirements.txt')
