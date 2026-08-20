@@ -23,7 +23,7 @@ A unified Python orchestrator that runs code analysis, security, quality, and te
 
 ### JS/TS/Node/React Ecosystem
 - **Snyk Open Source**: Dependency vulnerabilities. Requires `snyk` CLI installed and authenticated (`snyk auth`). Handles multiple package manifests.
-- **OWASP dep-scan**: Dependency vulnerabilities mapping to CVEs/GHSAs. Includes a configurable execution timeout (default 600s).
+- **OWASP dep-scan**: Dependency vulnerabilities mapping to CVEs/GHSAs. Defaults to the lightweight `app` scope. Silent huge VDB downloads are prevented by default. Set `DEPSCAN_AUTO_DOWNLOAD=true` or run `depscan-vdb download --scope app` manually to fetch the database. Includes a configurable execution timeout (default 600s).
 - **Dependency-Cruiser**: Architecture and forbidden dependency analysis. Requires `.dependency-cruiser.js` configuration.
 - **SonarQube Community**: Code quality and SAST. Requires `sonar-scanner` and `sonar-project.properties` (or `SONAR_HOST_URL` env var).
 - **React Doctor**: Code quality and best practices for React repositories. Automatically detects React via `package.json` or `.jsx`/`.tsx` files.

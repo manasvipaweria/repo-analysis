@@ -27,9 +27,25 @@ class DepScanAdapter(BaseAdapter):
 
         reports_dir = os.path.join(repo_path, "reports_depscan")
         timeout_seconds = int(os.environ.get("DEPSCAN_TIMEOUT_SECONDS", 600))
+        vdb_scope = os.environ.get("DEPSCAN_VDB_SCOPE", "app")
+        auto_download = os.environ.get("DEPSCAN_AUTO_DOWNLOAD", "false").lower() == "true"
         
         try:
-            cmd = ["depscan", "--src", repo_path, "--reports-dir", reports_dir]
+            # Check VDB status to avoid silent massive downloads
+            vdb_info_cmd = ["depscan-vdb", "info"]
+            vdb_info_result = subprocess.run(vdb_info_cmd, capture_output=True, text=True, check=False)
+            if "no local database" in vdb_info_result.stdout.lower() or "(none recorded)" in vdb_info_result.stdout.lower():
+                if not auto_download:
+                    return ToolResult(
+                        tool=self.tool_name,
+                        status=ToolStatus.SKIPPED,
+                        error_message=f"dep-scan VDB is missing. Skipping to avoid silent download. Run `depscan-vdb download --scope {vdb_scope}` or set DEPSCAN_AUTO_DOWNLOAD=true."
+                    )
+        except Exception:
+            pass # Fallback to normal execution if depscan-vdb info fails
+
+        try:
+            cmd = ["depscan", "--src", repo_path, "--reports-dir", reports_dir, "--vdb-scope", vdb_scope]
             
             try:
                 result = subprocess.run(
