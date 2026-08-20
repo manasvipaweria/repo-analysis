@@ -10,12 +10,22 @@ def test_depcruise_adapter_skipped_no_js(tmp_path):
     result = adapter.run(str(tmp_path))
     assert result.status == ToolStatus.SKIPPED
 
-def test_depcruise_adapter_skipped_no_config(tmp_path):
+def test_depcruise_adapter_uses_central_config(tmp_path):
     (tmp_path / "package.json").write_text("{}")
     adapter = DepcruiseAdapter()
-    result = adapter.run(str(tmp_path))
-    assert result.status == ToolStatus.SKIPPED
-    assert "No dependency-cruiser configuration" in result.error_message
+    
+    with patch('subprocess.run') as mock_run:
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "{}"
+        mock_run.return_value = mock_proc
+        
+        result = adapter.run(str(tmp_path))
+        assert result.status == ToolStatus.COMPLETED
+        
+        cmd = mock_run.call_args[0][0]
+        assert "dependency-cruiser" in cmd
+        assert "--config" in cmd
 
 def test_depcruise_adapter_success_with_vulns(tmp_path):
     (tmp_path / "package.json").write_text("{}")

@@ -26,15 +26,23 @@ class DepcruiseAdapter(BaseAdapter):
 
         config_files = ['.dependency-cruiser.js', '.dependency-cruiser.cjs', '.dependency-cruiser.json']
         has_config = any(os.path.exists(os.path.join(repo_path, c)) for c in config_files)
+        
+        cmd = ["npx", "dependency-cruiser", ".", "--output-type", "json"]
+        
         if not has_config:
-            return ToolResult(
-                tool=self.tool_name,
-                status=ToolStatus.SKIPPED,
-                error_message="No dependency-cruiser configuration file found."
+            # Fall back to default central configuration
+            central_config = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), '..', '..', 'configs', '.dependency-cruiser.js')
             )
+            if not os.path.exists(central_config):
+                return ToolResult(
+                    tool=self.tool_name,
+                    status=ToolStatus.ERROR,
+                    error_message="No local dependency-cruiser configuration found, and central default is missing."
+                )
+            cmd.extend(["--config", central_config])
 
         try:
-            cmd = ["npx", "depcruise", ".", "--output-type", "json"]
             
             result = subprocess.run(
                 cmd,
@@ -96,7 +104,7 @@ class DepcruiseAdapter(BaseAdapter):
             return ToolResult(
                 tool=self.tool_name,
                 status=ToolStatus.ERROR,
-                error_message="npx or depcruise executable not found."
+                error_message="npx or dependency-cruiser executable not found."
             )
         except Exception as e:
             return ToolResult(

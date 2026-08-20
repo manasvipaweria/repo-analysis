@@ -39,18 +39,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
+
       - name: Install orchestrator and CLI dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r orchestrator-repo/requirements.txt
           pip install owasp-depscan
           npm install -g snyk @cyclonedx/cdxgen dependency-cruiser react-doctor
+
+      - name: Cache dep-scan VDB
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.vdb
+          key: depscan-vdb-app-${{ runner.os }}-${{ hashFiles('orchestrator-repo/requirements.txt') }}
+          restore-keys: |
+            depscan-vdb-app-${{ runner.os }}-
+
+      - name: Provision dep-scan VDB
+        env:
+          VDB_HOME: ${{ github.workspace }}/.vdb
+        run: |
+          depscan-vdb download --scope app
+
+      - name: Verify CLI Tools
+        env:
+          VDB_HOME: ${{ github.workspace }}/.vdb
+        run: |
+          depscan --version || exit 1
+          depscan-vdb --version || exit 1
+          cdxgen --version || exit 1
           
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          VDB_HOME: ${{ github.workspace }}/.vdb
+          DEPSCAN_AUTO_DOWNLOAD: 'false'
         run: |
           cd target-repo
           rm -f report.json report.csv
