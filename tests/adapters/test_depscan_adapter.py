@@ -1,5 +1,6 @@
 import os
 import json
+import subprocess
 from unittest.mock import patch, MagicMock
 
 from src.adapters.depscan_adapter import DepScanAdapter
@@ -58,3 +59,14 @@ def test_depscan_adapter_success_with_vulns(tmp_path):
         assert finding.severity == "high"
         assert finding.file == "package.json"
         assert finding.rule_id == "CVE-2019-10744"
+
+def test_depscan_adapter_timeout(tmp_path):
+    (tmp_path / "package.json").write_text("{}")
+    
+    adapter = DepScanAdapter()
+    with patch('subprocess.run') as mock_run:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="depscan", timeout=600)
+        
+        result = adapter.run(str(tmp_path))
+        assert result.status == ToolStatus.ERROR
+        assert "timed out" in result.error_message

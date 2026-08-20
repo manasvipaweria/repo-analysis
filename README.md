@@ -21,14 +21,15 @@ A unified Python orchestrator that runs code analysis, security, quality, and te
 - **Import-Linter**: Architecture and dependency rules
 - **Semgrep**: Advanced SAST across languages
 
-### JS/TS/Node Ecosystem
+### JS/TS/Node/React Ecosystem
 - **Snyk Open Source**: Dependency vulnerabilities. Requires `snyk` CLI installed and authenticated (`snyk auth`). Handles multiple package manifests.
-- **OWASP dep-scan**: Dependency vulnerabilities mapping to CVEs/GHSAs.
+- **OWASP dep-scan**: Dependency vulnerabilities mapping to CVEs/GHSAs. Includes a configurable execution timeout (default 600s).
 - **Dependency-Cruiser**: Architecture and forbidden dependency analysis. Requires `.dependency-cruiser.js` configuration.
 - **SonarQube Community**: Code quality and SAST. Requires `sonar-scanner` and `sonar-project.properties` (or `SONAR_HOST_URL` env var).
+- **React Doctor**: Code quality and best practices for React repositories. Automatically detects React via `package.json` or `.jsx`/`.tsx` files.
 - **Semgrep**: Advanced SAST across languages.
 
-*Note: The orchestrator automatically detects the ecosystem based on files (e.g. `package.json`, `.py`) and gracefully skips tools that are not applicable to the repository.*
+*Note: The orchestrator automatically detects the ecosystem based on files (e.g. `package.json`, `.py`, `.jsx`) and gracefully skips tools that are not applicable to the repository. If a tool crashes or times out, it is isolated and the orchestrator continues with the remaining tools safely.*
 
 ## Setup
 

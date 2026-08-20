@@ -66,7 +66,7 @@ class SnykAdapter(BaseAdapter):
             findings = []
             for project in output_data:
                 # Snyk project structure has a targetFile (e.g. package.json)
-                target_file = project.get('displayTargetFile', 'package.json')
+                target_file = project.get("displayTargetFile", "package.json").replace("\\", "/")
                 
                 vulnerabilities = project.get('vulnerabilities', [])
                 for vuln in vulnerabilities:

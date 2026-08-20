@@ -17,6 +17,7 @@ from src.adapters.snyk_adapter import SnykAdapter
 from src.adapters.depscan_adapter import DepScanAdapter
 from src.adapters.depcruise_adapter import DepcruiseAdapter
 from src.adapters.sonarqube_adapter import SonarQubeAdapter
+from src.adapters.react_doctor_adapter import ReactDoctorAdapter
 
 ALL_ADAPTERS = {
     "ruff": RuffAdapter(),
@@ -29,7 +30,8 @@ ALL_ADAPTERS = {
     "snyk": SnykAdapter(),
     "dep-scan": DepScanAdapter(),
     "dependency-cruiser": DepcruiseAdapter(),
-    "sonarqube": SonarQubeAdapter()
+    "sonarqube": SonarQubeAdapter(),
+    "react-doctor": ReactDoctorAdapter()
 }
 
 def main():

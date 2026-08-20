@@ -114,9 +114,9 @@ class SonarQubeAdapter(BaseAdapter):
                 component = issue.get('component', '')
                 if ':' in component:
                     # component is usually project_key:file_path
-                    file_path = component.split(':', 1)[1]
+                    file_path = component.split(':', 1)[1].replace("\\", "/")
                 else:
-                    file_path = component
+                    file_path = component.replace("\\", "/")
                     
                 sq_type = issue.get('type', '')
                 cat = Category.QUALITY.value

@@ -26,16 +26,25 @@ class DepScanAdapter(BaseAdapter):
             )
 
         reports_dir = os.path.join(repo_path, "reports_depscan")
+        timeout_seconds = int(os.environ.get("DEPSCAN_TIMEOUT_SECONDS", 600))
         
         try:
             cmd = ["depscan", "--src", repo_path, "--reports-dir", reports_dir]
             
-            result = subprocess.run(
-                cmd,
-                cwd=repo_path,
-                capture_output=True,
-                text=True, encoding="utf-8", errors="replace"
-            )
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=repo_path,
+                    capture_output=True,
+                    text=True, encoding="utf-8", errors="replace",
+                    timeout=timeout_seconds
+                )
+            except subprocess.TimeoutExpired as e:
+                return ToolResult(
+                    tool=self.tool_name,
+                    status=ToolStatus.ERROR,
+                    error_message=f"dep-scan execution timed out after {timeout_seconds} seconds."
+                )
             
             findings = []
             
@@ -70,7 +79,7 @@ class DepScanAdapter(BaseAdapter):
                             # Dep-scan sometimes gives a manifest path, or we default
                             manifest = item.get("manifest", "package.json")
                             if manifest.startswith(repo_path):
-                                manifest = os.path.relpath(manifest, repo_path)
+                                manifest = os.path.relpath(manifest, repo_path).replace("\\", "/")
                                 
                             findings.append(Finding(
                                 category=Category.DEPENDENCIES.value,

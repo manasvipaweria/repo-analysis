@@ -71,8 +71,8 @@ class DepcruiseAdapter(BaseAdapter):
                 else:
                     normalized_severity = "low"
                     
-                from_path = violation.get('from', '')
-                to_path = violation.get('to', '')
+                from_path = violation.get('from', '').replace("\\", "/")
+                to_path = violation.get('to', '').replace("\\", "/")
                 
                 msg = f"Dependency violation ({rule_name}): {from_path} -> {to_path}"
                 

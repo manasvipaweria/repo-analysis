@@ -6,6 +6,7 @@ from src.adapters.snyk_adapter import SnykAdapter
 from src.adapters.depscan_adapter import DepScanAdapter
 from src.adapters.depcruise_adapter import DepcruiseAdapter
 from src.adapters.sonarqube_adapter import SonarQubeAdapter
+from src.adapters.react_doctor_adapter import ReactDoctorAdapter
 
 @pytest.fixture
 def js_project_path():
@@ -17,7 +18,8 @@ def test_js_integration(js_project_path):
         SnykAdapter(),
         DepScanAdapter(),
         DepcruiseAdapter(),
-        SonarQubeAdapter()
+        SonarQubeAdapter(),
+        ReactDoctorAdapter()
     ]
     orchestrator = Orchestrator(adapters=adapters)
     
