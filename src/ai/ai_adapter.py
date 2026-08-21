@@ -51,12 +51,21 @@ class AIAdapter:
         }
         
         try:
-            response = requests.post(self.api_url, json=payload, headers=headers)
+            response = requests.post(self.api_url, json=payload, headers=headers, timeout=60)
             response.raise_for_status()
             
             result_json = response.json()
             content = result_json["choices"][0]["message"]["content"]
             ai_results = json.loads(content).get("results", [])
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code
+            try:
+                error_body = e.response.json()
+                provider_msg = error_body.get("error", {}).get("message", e.response.text)
+            except Exception:
+                provider_msg = e.response.text
+                
+            return {"status": "ERROR", "error_message": f"AI API request failed (HTTP {status_code}): {provider_msg}"}
         except requests.exceptions.RequestException as e:
             return {"status": "ERROR", "error_message": f"AI API request failed: {e}"}
         except (KeyError, json.JSONDecodeError) as e:

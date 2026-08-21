@@ -167,3 +167,40 @@ def test_ai_adapter_success(mock_post, tmp_path, monkeypatch):
     
     f2 = next(f for f in updated_report["findings"] if f["finding_id"] == "f2")
     assert "ai_fields" not in f2
+
+@patch("src.ai.ai_adapter.requests.post")
+def test_ai_adapter_http_error(mock_post, tmp_path, monkeypatch):
+    import requests
+    monkeypatch.setenv("AI_API_KEY", "dummy")
+    
+    ai_input = tmp_path / "ai_input.json"
+    report_file = tmp_path / "report.json"
+    
+    ai_data = {
+        "findings": [
+            {"finding_id": "f1"}
+        ]
+    }
+    ai_input.write_text(json.dumps(ai_data))
+    
+    # Mock requests.exceptions.HTTPError
+    mock_resp = MagicMock()
+    mock_resp.status_code = 429
+    mock_resp.json.return_value = {
+        "error": {
+            "message": "Too Many Requests - Rate limit exceeded."
+        }
+    }
+    mock_err = requests.exceptions.HTTPError("429 Client Error")
+    mock_err.response = mock_resp
+    
+    # Make raise_for_status throw the error
+    mock_resp.raise_for_status.side_effect = mock_err
+    mock_post.return_value = mock_resp
+    
+    adapter = AIAdapter()
+    result = adapter.run(str(ai_input), str(report_file))
+    
+    assert result["status"] == "ERROR"
+    assert "HTTP 429" in result["error_message"]
+    assert "Too Many Requests - Rate limit exceeded." in result["error_message"]
