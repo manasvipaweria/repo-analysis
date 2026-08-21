@@ -115,9 +115,31 @@ jobs:
 4. **JSON + CSV**: It generates the reports with the target repository's identifier (e.g., `manasvipaweria/Custom-Assembler`).
 5. **Artifact**: The reports are uploaded as the `repo-analysis-report` artifact to the target repository's workflow run.
 
+### AI Analysis Stage
+
+The orchestrator now supports an AI-powered post-processing stage to validate findings, reduce false positives, and provide concrete remediation suggestions. 
+
+To run the AI analysis, use the `--run-ai` flag:
+
+```bash
+python analyze_repo.py https://github.com/user/repo --run-ai
+```
+
+#### How it works:
+1. **Report Processor**: After the standard scanners generate `report.json`, the Report Processor validates finding counts and extracts only the relevant data needed for AI reasoning into a smaller `ai_input.json` file, shedding unnecessary tool metadata.
+2. **Secret Redaction**: Before `ai_input.json` is generated, a mandatory secret redaction layer scrubs the `message` and `code_context` fields for sensitive credentials (API keys, JWTs, cloud credentials, etc.), replacing them with `[REDACTED_SECRET]`.
+3. **AI Adapter**: The generic AI adapter reads `ai_input.json`, loads the versioned skill instructions (`src/ai/skills/ai_analysis_v1.txt`), and queries the configured AI provider.
+4. **AI Enriched Report**: The adapter writes the structural AI response back into the original `report.json`, appending `ai_fields` to the corresponding findings. 
+
+#### AI Configuration
+Set the following environment variables to configure the AI provider:
+- `AI_API_KEY`: Your AI provider API key. (If missing, the AI stage gracefully skips).
+- `AI_API_URL`: The API endpoint (defaults to OpenAI chat completions).
+- `AI_MODEL`: The model to use (defaults to `gpt-4-turbo-preview`).
+- `AI_BATCH_SIZE`: Controls how many findings are analyzed initially (defaults to `5`).
+
 ### Future Enhancements
 The following features are intentionally deferred to a later phase and are not yet implemented:
-- Merge blocking (not yet enforced by GitHub branch protection)
-- AI/LLM integration (Gemini, OpenAI, Claude) for analysis or automatic remediation
-- PR comments or inline code annotations
 - Automatic code fixes pushed back to the branch
+- Historical / new-finding incremental analysis comparison
+- Production/Merge blocking enforcement natively within GitHub branch protection

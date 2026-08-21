@@ -45,6 +45,7 @@ def main():
         default=",".join(ALL_ADAPTERS.keys())
     )
     parser.add_argument("--output", help="Comma-separated list of outputs (json,csv)", default="json,csv")
+    parser.add_argument("--run-ai", action="store_true", help="Run the AI analysis stage after scanner execution")
     
     args = parser.parse_args()
     
@@ -81,6 +82,27 @@ def main():
             json_file = "report.json"
             write_json_report(report, json_file)
             print(f"[*] JSON report saved to {json_file}")
+            
+            if args.run_ai:
+                print("\n[*] Starting AI Analysis Stage")
+                ai_input_file = "ai_input.json"
+                try:
+                    from src.ai.report_processor import process_report
+                    from src.ai.ai_adapter import AIAdapter
+                    
+                    process_report(json_file, ai_input_file)
+                    print(f"[*] AI input generated at {ai_input_file}")
+                    
+                    ai_adapter = AIAdapter()
+                    ai_result = ai_adapter.run(ai_input_file, json_file)
+                    print(f"[*] AI Adapter Result: {ai_result}")
+                    
+                except ImportError as e:
+                    print(f"[-] AI modules not found or failed to load: {e}")
+                except Exception as e:
+                    print(f"[-] Error during AI processing: {e}")
+                    import traceback
+                    traceback.print_exc()
             
         if "csv" in outputs:
             csv_file = "report.csv"
