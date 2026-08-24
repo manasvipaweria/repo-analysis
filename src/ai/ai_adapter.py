@@ -1,19 +1,26 @@
 import os
 import json
-import requests
+import argparse
 from typing import Dict, Any
+
+from .providers.mock import MockAIProvider
+from .providers.openai_provider import OpenAIProvider
+from .providers.gemini_provider import GeminiProvider
 
 class AIAdapter:
     def __init__(self):
-        self.api_key = os.environ.get("AI_API_KEY")
-        self.api_url = os.environ.get("AI_API_URL", "https://api.openai.com/v1/chat/completions")
-        self.model = os.environ.get("AI_MODEL", "gpt-4-turbo-preview")
+        self.provider_name = os.environ.get("AI_PROVIDER", "openai").lower()
         self.batch_size = int(os.environ.get("AI_BATCH_SIZE", "5"))
+        self.max_tokens = int(os.environ.get("AI_MAX_OUTPUT_TOKENS", "500"))
         
-    def run(self, ai_input_file: str, report_file: str) -> Dict[str, Any]:
-        if not self.api_key:
-            return {"status": "SKIPPED", "error_message": "AI credentials missing (AI_API_KEY not set)."}
+        if self.provider_name == "mock":
+            self.provider = MockAIProvider()
+        elif self.provider_name == "gemini":
+            self.provider = GeminiProvider()
+        else:
+            self.provider = OpenAIProvider()
             
+    def run(self, ai_input_file: str, report_file: str, estimate_only: bool = False) -> Dict[str, Any]:
         if not os.path.exists(ai_input_file):
             return {"status": "ERROR", "error_message": f"AI input file {ai_input_file} not found."}
             
@@ -25,6 +32,9 @@ class AIAdapter:
                 
         findings = ai_data.get("findings", [])
         if not findings:
+            if estimate_only:
+                print("No findings to estimate.")
+                return {"status": "COMPLETED"}
             return {"status": "COMPLETED", "message": "No findings to analyze.", "analyzed": 0}
             
         findings_to_analyze = findings[:self.batch_size]
@@ -36,41 +46,29 @@ class AIAdapter:
         with open(skill_path, 'r', encoding='utf-8') as f:
             skill_content = f.read()
             
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": skill_content},
-                {"role": "user", "content": json.dumps({"findings": findings_to_analyze}, indent=2)}
-            ],
-            "response_format": {"type": "json_object"}
-        }
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        try:
-            response = requests.post(self.api_url, json=payload, headers=headers, timeout=60)
-            response.raise_for_status()
+        if estimate_only:
+            estimation = self.provider.estimate_tokens(findings_to_analyze, skill_content, self.max_tokens)
+            print("\nAI TOKEN ESTIMATE")
+            print("-----------------")
+            print(f"Provider: {estimation['provider']}")
+            print(f"Model: {estimation['model']}")
+            print(f"Findings: {len(findings_to_analyze)}\n")
+            print(f"Skill/instruction tokens: ~{estimation['skill_tokens']}")
+            print(f"Finding/input tokens: ~{estimation['finding_tokens']}")
+            print(f"Estimated input tokens: ~{estimation['estimated_input']}")
+            print(f"Configured max output tokens: {estimation['max_output']}")
+            print(f"Estimated maximum token budget: ~{estimation['estimated_total']}\n")
+            print("No API request was made.")
+            print("No API quota was consumed.")
+            return {"status": "COMPLETED"}
             
-            result_json = response.json()
-            content = result_json["choices"][0]["message"]["content"]
-            ai_results = json.loads(content).get("results", [])
-        except requests.exceptions.HTTPError as e:
-            status_code = e.response.status_code
-            try:
-                error_body = e.response.json()
-                provider_msg = error_body.get("error", {}).get("message", e.response.text)
-            except Exception:
-                provider_msg = e.response.text
-                
-            return {"status": "ERROR", "error_message": f"AI API request failed (HTTP {status_code}): {provider_msg}"}
-        except requests.exceptions.RequestException as e:
-            return {"status": "ERROR", "error_message": f"AI API request failed: {e}"}
-        except (KeyError, json.JSONDecodeError) as e:
-            return {"status": "ERROR", "error_message": f"Malformed AI response: {e}"}
+        response = self.provider.analyze(findings_to_analyze, skill_content, self.max_tokens)
+        
+        if response["status"] != "COMPLETED":
+            return response
             
+        ai_results = response.get("results", [])
+        
         # Map back to report.json
         if not os.path.exists(report_file):
             return {"status": "ERROR", "error_message": f"Original report {report_file} not found."}
@@ -98,15 +96,18 @@ class AIAdapter:
             "status": "COMPLETED", 
             "selected": len(findings_to_analyze), 
             "analyzed": success_count,
-            "rejected": len(findings_to_analyze) - success_count
+            "rejected": len(findings_to_analyze) - success_count,
+            "usage": response.get("usage", {"available": False})
         }
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 3:
-        print("Usage: python ai_adapter.py <ai_input.json> <report.json>")
-        sys.exit(1)
-        
+    parser = argparse.ArgumentParser()
+    parser.add_argument("ai_input", help="Path to ai_input.json")
+    parser.add_argument("report", help="Path to report.json")
+    parser.add_argument("--estimate-tokens", action="store_true", help="Estimate tokens without API call")
+    args = parser.parse_args()
+    
     adapter = AIAdapter()
-    result = adapter.run(sys.argv[1], sys.argv[2])
-    print(json.dumps(result, indent=2))
+    result = adapter.run(args.ai_input, args.report, estimate_only=args.estimate_tokens)
+    if not args.estimate_tokens:
+        print(json.dumps(result, indent=2))

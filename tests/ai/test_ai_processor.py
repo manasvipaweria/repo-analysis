@@ -91,12 +91,46 @@ def test_process_report_with_findings(tmp_path):
     assert "mysecretpassword123" not in f1["code_context"]
     assert "[REDACTED_SECRET]" in f1["code_context"]
 
+def test_ai_adapter_mock_provider(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    
+    ai_input = tmp_path / "ai_input.json"
+    report_file = tmp_path / "report.json"
+    
+    ai_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    ai_input.write_text(json.dumps(ai_data))
+    
+    report_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    report_file.write_text(json.dumps(report_data))
+    
+    adapter = AIAdapter()
+    result = adapter.run(str(ai_input), str(report_file))
+    
+    assert result["status"] == "COMPLETED"
+    assert result["analyzed"] == 1
+    
+    with open(str(report_file), 'r') as f:
+        updated_report = json.load(f)
+        
+    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
+    assert "ai_fields" in f1
+    assert "[MOCK AI]" in f1["ai_fields"]["analysis_summary"]
+
 def test_ai_adapter_missing_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.delenv("AI_API_KEY", raising=False)
     
     ai_input = tmp_path / "ai_input.json"
     report_file = tmp_path / "report.json"
-    ai_input.write_text("{}")
+    
+    ai_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    ai_input.write_text(json.dumps(ai_data))
     
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
@@ -104,8 +138,9 @@ def test_ai_adapter_missing_credentials(tmp_path, monkeypatch):
     assert result["status"] == "SKIPPED"
     assert "AI credentials missing" in result["error_message"]
 
-@patch("src.ai.ai_adapter.requests.post")
-def test_ai_adapter_success(mock_post, tmp_path, monkeypatch):
+@patch("src.ai.providers.openai_provider.requests.post")
+def test_ai_adapter_openai_success(mock_post, tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("AI_API_KEY", "dummy")
     monkeypatch.setenv("AI_BATCH_SIZE", "2")
     
@@ -168,9 +203,10 @@ def test_ai_adapter_success(mock_post, tmp_path, monkeypatch):
     f2 = next(f for f in updated_report["findings"] if f["finding_id"] == "f2")
     assert "ai_fields" not in f2
 
-@patch("src.ai.ai_adapter.requests.post")
-def test_ai_adapter_http_error(mock_post, tmp_path, monkeypatch):
+@patch("src.ai.providers.openai_provider.requests.post")
+def test_ai_adapter_openai_http_error(mock_post, tmp_path, monkeypatch):
     import requests
+    monkeypatch.setenv("AI_PROVIDER", "openai")
     monkeypatch.setenv("AI_API_KEY", "dummy")
     
     ai_input = tmp_path / "ai_input.json"
@@ -204,3 +240,107 @@ def test_ai_adapter_http_error(mock_post, tmp_path, monkeypatch):
     assert result["status"] == "ERROR"
     assert "HTTP 429" in result["error_message"]
     assert "Too Many Requests - Rate limit exceeded." in result["error_message"]
+
+def test_gemini_missing_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    
+    ai_input = tmp_path / "ai_input.json"
+    report_file = tmp_path / "report.json"
+    
+    ai_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    ai_input.write_text(json.dumps(ai_data))
+    
+    adapter = AIAdapter()
+    result = adapter.run(str(ai_input), str(report_file))
+    
+    assert result["status"] == "SKIPPED"
+    assert "GEMINI_API_KEY not set" in result["error_message"]
+
+@patch("src.ai.providers.gemini_provider.requests.post")
+def test_ai_adapter_gemini_success(mock_post, tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    
+    ai_input = tmp_path / "ai_input.json"
+    report_file = tmp_path / "report.json"
+    
+    ai_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    ai_input.write_text(json.dumps(ai_data))
+    
+    report_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    report_file.write_text(json.dumps(report_data))
+    
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": json.dumps({
+                                "results": [
+                                    {
+                                        "finding_id": "f1",
+                                        "analysis_summary": "Gemini analyzed this.",
+                                        "remediation_suggestion": "Fix.",
+                                        "is_false_positive_prediction": True
+                                    }
+                                ]
+                            })
+                        }
+                    ]
+                }
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "candidatesTokenCount": 20,
+            "totalTokenCount": 30
+        }
+    }
+    mock_post.return_value = mock_resp
+    
+    adapter = AIAdapter()
+    result = adapter.run(str(ai_input), str(report_file))
+    
+    assert result["status"] == "COMPLETED"
+    assert result["analyzed"] == 1
+    
+    with open(str(report_file), 'r') as f:
+        updated_report = json.load(f)
+        
+    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
+    assert "ai_fields" in f1
+    assert f1["ai_fields"]["analysis_summary"] == "Gemini analyzed this."
+    assert result["usage"]["total_tokens"] == 30
+
+def test_estimate_tokens_gemini(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    
+    ai_input = tmp_path / "ai_input.json"
+    report_file = tmp_path / "report.json"
+    
+    ai_data = {
+        "findings": [{"finding_id": "f1"}]
+    }
+    ai_input.write_text(json.dumps(ai_data))
+    report_file.write_text("{}")
+    
+    adapter = AIAdapter()
+    result = adapter.run(str(ai_input), str(report_file), estimate_only=True)
+    
+    assert result["status"] == "COMPLETED"
+    
+    captured = capsys.readouterr()
+    assert "AI TOKEN ESTIMATE" in captured.out
+    assert "Provider: Gemini" in captured.out
+    assert "No API request was made." in captured.out
+

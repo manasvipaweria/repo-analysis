@@ -132,11 +132,34 @@ python analyze_repo.py https://github.com/user/repo --run-ai
 4. **AI Enriched Report**: The adapter writes the structural AI response back into the original `report.json`, appending `ai_fields` to the corresponding findings. 
 
 #### AI Configuration
-Set the following environment variables to configure the AI provider:
-- `AI_API_KEY`: Your AI provider API key. (If missing, the AI stage gracefully skips).
+The orchestrator uses a provider-agnostic architecture. Set the following environment variables:
+- `AI_PROVIDER`: The provider to use (`mock`, `openai`, `gemini`). Defaults to `openai`.
+- `AI_BATCH_SIZE`: Controls how many findings are analyzed initially (defaults to `5`).
+- `AI_MAX_OUTPUT_TOKENS`: Maximum tokens the model may generate (defaults to `500`).
+
+**OpenAI Provider (`AI_PROVIDER=openai`)**
+- `AI_API_KEY`: Your OpenAI API key.
 - `AI_API_URL`: The API endpoint (defaults to OpenAI chat completions).
 - `AI_MODEL`: The model to use (defaults to `gpt-4-turbo-preview`).
-- `AI_BATCH_SIZE`: Controls how many findings are analyzed initially (defaults to `5`).
+
+**Gemini Provider (`AI_PROVIDER=gemini`)**
+- `GEMINI_API_KEY`: Your Gemini API key.
+- `GEMINI_MODEL`: The model to use (defaults to `gemini-1.5-flash`).
+
+**Mock Provider (`AI_PROVIDER=mock`)**
+No credentials required. Fast, deterministic, completely local response. The output explicitly labels itself as mock and does not represent a real security assessment.
+
+If credentials are required but missing, the AI stage gracefully skips. 
+
+#### Token Estimation (Dry Run)
+You can estimate token usage without consuming API quota or making network calls:
+```bash
+python -m src.ai.ai_adapter ai_input.json report.json --estimate-tokens
+```
+This local calculation evaluates your skill and input size (using approximation heuristics where exact provider tokenizers are not locally available).
+
+### Adding a new AI Provider
+To add a new AI provider, create a new class in `src/ai/providers/` extending `AIProvider`. Implement the `analyze` and `estimate_tokens` methods, then register it in `AIAdapter.__init__`. The core logic (`report_processor.py` and finding schemas) requires zero modification.
 
 ### Future Enhancements
 The following features are intentionally deferred to a later phase and are not yet implemented:
