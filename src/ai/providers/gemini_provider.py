@@ -46,6 +46,7 @@ class GeminiProvider(AIProvider):
             parsed_usage = {
                 "input_tokens": usage.get("promptTokenCount"),
                 "output_tokens": usage.get("candidatesTokenCount"),
+                "cached_tokens": usage.get("cachedContentTokenCount", 0),
                 "total_tokens": usage.get("totalTokenCount")
             } if usage else {"available": False}
             
