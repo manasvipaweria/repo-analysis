@@ -11,7 +11,7 @@ class AIAdapter:
     def __init__(self):
         self.provider_name = os.environ.get("AI_PROVIDER", "openai").lower()
         self.batch_size = int(os.environ.get("AI_BATCH_SIZE", "5"))
-        self.max_tokens = int(os.environ.get("AI_MAX_OUTPUT_TOKENS", "500"))
+        self.max_tokens = int(os.environ.get("AI_MAX_OUTPUT_TOKENS", "1000"))
         
         if self.provider_name == "mock":
             self.provider = MockAIProvider()
@@ -37,8 +37,6 @@ class AIAdapter:
                 return {"status": "COMPLETED"}
             return {"status": "COMPLETED", "message": "No findings to analyze.", "analyzed": 0}
             
-        findings_to_analyze = findings[:self.batch_size]
-        
         skill_path = os.path.join(os.path.dirname(__file__), "skills", "ai_analysis_v1.txt")
         if not os.path.exists(skill_path):
             return {"status": "ERROR", "error_message": "AI skill file not found."}
@@ -47,12 +45,13 @@ class AIAdapter:
             skill_content = f.read()
             
         if estimate_only:
-            estimation = self.provider.estimate_tokens(findings_to_analyze, skill_content, self.max_tokens)
+            # Estimate on the whole set, or just sum it up
+            estimation = self.provider.estimate_tokens(findings, skill_content, self.max_tokens)
             print("\nAI TOKEN ESTIMATE")
             print("-----------------")
             print(f"Provider: {estimation['provider']}")
             print(f"Model: {estimation['model']}")
-            print(f"Findings: {len(findings_to_analyze)}\n")
+            print(f"Findings: {len(findings)}\n")
             print(f"Skill/instruction tokens: ~{estimation['skill_tokens']}")
             print(f"Finding/input tokens: ~{estimation['finding_tokens']}")
             print(f"Estimated input tokens: ~{estimation['estimated_input']}")
@@ -62,14 +61,77 @@ class AIAdapter:
             print("No API quota was consumed.")
             return {"status": "COMPLETED"}
             
-        response = self.provider.analyze(findings_to_analyze, skill_content, self.max_tokens)
+        import math
+        total_findings = len(findings)
+        total_steps = math.ceil(total_findings / self.batch_size)
         
-        if response["status"] != "COMPLETED":
-            return response
+        cumulative_usage = {
+            "input_tokens": 0,
+            "cached_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0
+        }
+        
+        all_ai_results = []
+        steps_completed = 0
+        final_status = "COMPLETED"
+        error_message = None
+
+        print(f"\nAI ANALYSIS")
+        
+        for step in range(total_steps):
+            start_idx = step * self.batch_size
+            end_idx = start_idx + self.batch_size
+            chunk = findings[start_idx:end_idx]
             
-        ai_results = response.get("results", [])
-        
-        # Map back to report.json
+            response = self.provider.analyze(chunk, skill_content, self.max_tokens)
+            
+            usage = response.get("usage", {})
+            new_input = usage.get("input_tokens", 0) or 0
+            cached = usage.get("cached_tokens", 0) or 0
+            output_tok = usage.get("output_tokens", 0) or 0
+            total_tok = usage.get("total_tokens", 0) or 0
+            
+            cumulative_usage["input_tokens"] += new_input
+            cumulative_usage["cached_tokens"] += cached
+            cumulative_usage["output_tokens"] += output_tok
+            cumulative_usage["total_tokens"] += total_tok
+            
+            steps_completed += 1
+            
+            print(f"[AI] Step {steps_completed}/{total_steps}")
+            print(f"[AI] Findings in step: {len(chunk)}")
+            print(f"[AI] New input tokens: {new_input}")
+            print(f"[AI] Cached input tokens: {cached}")
+            print(f"[AI] Output tokens: {output_tok}")
+            print(f"[AI] Total tokens: {total_tok}")
+            print(f"[AI] Cumulative total tokens: {cumulative_usage['total_tokens']}\n")
+
+            if response["status"] != "COMPLETED":
+                # Check for quota or limits
+                err_str = str(response.get("error_message", "")).lower()
+                if "429" in err_str or "quota" in err_str or "rate limit" in err_str:
+                    final_status = "QUOTA_LIMIT_REACHED"
+                else:
+                    final_status = "ERROR"
+                error_message = response.get("error_message")
+                break
+                
+            all_ai_results.extend(response.get("results", []))
+
+        print(f"AI ANALYSIS USAGE")
+        print(f"-----------------")
+        print(f"Steps completed: {steps_completed}/{total_steps}")
+        print(f"Findings analyzed: {len(all_ai_results)}/{total_findings}")
+        print(f"New input tokens: {cumulative_usage['input_tokens']}")
+        print(f"Cached input tokens: {cumulative_usage['cached_tokens']}")
+        print(f"Output tokens: {cumulative_usage['output_tokens']}")
+        print(f"Total tokens: {cumulative_usage['total_tokens']}")
+        print(f"Remaining findings: {total_findings - len(all_ai_results)}")
+        if final_status != "COMPLETED":
+            print(f"Status: {final_status}")
+
+        # Map back to report.json regardless of completion status to save partial progress
         if not os.path.exists(report_file):
             return {"status": "ERROR", "error_message": f"Original report {report_file} not found."}
             
@@ -79,11 +141,12 @@ class AIAdapter:
         finding_map = {f["finding_id"]: f for f in full_report.get("findings", [])}
         
         success_count = 0
-        for ai_res in ai_results:
+        for ai_res in all_ai_results:
             fid = ai_res.get("finding_id")
             if fid and fid in finding_map:
                 finding_map[fid]["ai_fields"] = {
                     "analysis_summary": ai_res.get("analysis_summary"),
+                    "security_impact": ai_res.get("security_impact"),
                     "remediation_suggestion": ai_res.get("remediation_suggestion"),
                     "is_false_positive_prediction": ai_res.get("is_false_positive_prediction")
                 }
@@ -92,13 +155,18 @@ class AIAdapter:
         with open(report_file, 'w', encoding='utf-8') as f:
             json.dump(full_report, f, indent=2)
             
-        return {
-            "status": "COMPLETED", 
-            "selected": len(findings_to_analyze), 
+        result = {
+            "status": final_status, 
+            "selected": total_findings, 
             "analyzed": success_count,
-            "rejected": len(findings_to_analyze) - success_count,
-            "usage": response.get("usage", {"available": False})
+            "rejected": len(all_ai_results) - success_count,
+            "usage": cumulative_usage
         }
+        
+        if error_message:
+            result["error_message"] = error_message
+            
+        return result
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

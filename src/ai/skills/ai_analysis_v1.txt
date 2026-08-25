@@ -15,12 +15,17 @@ For each finding provided in the JSON input:
 11. Treat scanner severity and your own AI confidence as separate concepts.
 12. For dependency vulnerabilities, reason about the package/version rather than inventing a source-code line.
 
-You must return a JSON object with the following exact structure mapped by finding_id:
+You must return ONLY a raw JSON object with the following exact structure mapped by finding_id.
+Do NOT wrap the response in Markdown blocks like ```json ... ```.
+Do NOT add introductory text.
+Do NOT add any preamble or explanation outside the JSON.
+
 {
   "results": [
     {
       "finding_id": "the-finding-id-from-input",
-      "analysis_summary": "Your detailed explanation, reasoning, and impact analysis.",
+      "analysis_summary": "Your detailed explanation and reasoning.",
+      "security_impact": "The practical impact if the finding is true.",
       "remediation_suggestion": "Concrete steps to fix the issue.",
       "is_false_positive_prediction": false
     }

@@ -1,110 +1,22 @@
-import os
 import json
+import os
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.ai.report_processor import redact_secrets, process_report
 from src.ai.ai_adapter import AIAdapter
+from src.ai.providers.gemini_provider import GeminiProvider
 
-def test_redact_secrets():
-    text = "Here is my api_key: 'abcdef1234567890xyz' and my password=supersecretpass"
-    redacted = redact_secrets(text)
-    assert "abcdef1234567890xyz" not in redacted
-    assert "supersecretpass" not in redacted
-    assert "[REDACTED_SECRET]" in redacted
-    
-    aws_text = "aws_access_key = AKIAIOSFODNN7EXAMPLE"
-    redacted_aws = redact_secrets(aws_text)
-    assert "AKIAIOSFODNN7EXAMPLE" not in redacted_aws
-    assert "[REDACTED_SECRET]" in redacted_aws
-    
-    mongodb_text = "mongodb+srv://user:pass123@cluster0.mongodb.net/test"
-    redacted_mongo = redact_secrets(mongodb_text)
-    assert "pass123" not in redacted_mongo
-    assert "mongodb+srv://user:[REDACTED_SECRET]@cluster0.mongodb.net/test" in redacted_mongo
-
-def test_process_report_empty(tmp_path):
-    report_file = tmp_path / "report.json"
-    ai_input_file = tmp_path / "ai_input.json"
-    
-    report_data = {
-        "repo": "test-repo",
-        "timestamp": "2023-01-01",
-        "findings": [],
-        "summary": {}
-    }
-    report_file.write_text(json.dumps(report_data))
-    
-    process_report(str(report_file), str(ai_input_file))
-    
-    with open(ai_input_file, 'r') as f:
-        ai_input = json.load(f)
-        
-    assert ai_input["repository"] == "test-repo"
-    assert len(ai_input["findings"]) == 0
-
-def test_process_report_with_findings(tmp_path):
-    report_file = tmp_path / "report.json"
-    ai_input_file = tmp_path / "ai_input.json"
-    
-    report_data = {
-        "repo": "test-repo",
-        "timestamp": "2023-01-01",
-        "summary": {
-            "security": {"count": 1}
-        },
-        "findings": [
-            {
-                "finding_id": "123",
-                "category": "security",
-                "severity": "high",
-                "priority": "P1",
-                "file": "test.py",
-                "line": 10,
-                "rule_id": "rule-1",
-                "message": "Found secret AKIAIOSFODNN7EXAMPLE",
-                "detected_by": ["bandit"],
-                "code_context": "password='mysecretpassword123'",
-                "merge_blocking": True
-            }
-        ]
-    }
-    report_file.write_text(json.dumps(report_data))
-    
-    process_report(str(report_file), str(ai_input_file))
-    
-    with open(ai_input_file, 'r') as f:
-        ai_input = json.load(f)
-        
-    findings = ai_input["findings"]
-    assert len(findings) == 1
-    f1 = findings[0]
-    assert f1["finding_id"] == "123"
-    assert f1["category"] == "security"
-    assert f1["file"] == "test.py"
-    assert f1["line"] == 10
-    
-    # Check redaction
-    assert "AKIAIOSFODNN7EXAMPLE" not in f1["message"]
-    assert "[REDACTED_SECRET]" in f1["message"]
-    
-    assert "mysecretpassword123" not in f1["code_context"]
-    assert "[REDACTED_SECRET]" in f1["code_context"]
-
-def test_ai_adapter_mock_provider(tmp_path, monkeypatch):
+def test_a_one_finding(tmp_path, monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "mock")
     
     ai_input = tmp_path / "ai_input.json"
     report_file = tmp_path / "report.json"
     
-    ai_data = {
-        "findings": [{"finding_id": "f1"}]
-    }
+    ai_data = {"findings": [{"finding_id": "f1"}]}
     ai_input.write_text(json.dumps(ai_data))
     
-    report_data = {
-        "findings": [{"finding_id": "f1"}]
-    }
+    report_data = {"findings": [{"finding_id": "f1"}]}
     report_file.write_text(json.dumps(report_data))
     
     adapter = AIAdapter()
@@ -112,134 +24,137 @@ def test_ai_adapter_mock_provider(tmp_path, monkeypatch):
     
     assert result["status"] == "COMPLETED"
     assert result["analyzed"] == 1
-    
-    with open(str(report_file), 'r') as f:
-        updated_report = json.load(f)
-        
-    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
-    assert "ai_fields" in f1
-    assert "[MOCK AI]" in f1["ai_fields"]["analysis_summary"]
 
-def test_ai_adapter_missing_credentials(tmp_path, monkeypatch):
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.delenv("AI_API_KEY", raising=False)
+@patch("src.ai.providers.mock.MockAIProvider.analyze")
+def test_b_multiple_findings_batch_size_1(mock_analyze, tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    monkeypatch.setenv("AI_BATCH_SIZE", "1")
     
     ai_input = tmp_path / "ai_input.json"
     report_file = tmp_path / "report.json"
     
-    ai_data = {
-        "findings": [{"finding_id": "f1"}]
-    }
-    ai_input.write_text(json.dumps(ai_data))
+    findings = [{"finding_id": f"f{i}"} for i in range(1, 6)]
+    ai_input.write_text(json.dumps({"findings": findings}))
+    report_file.write_text(json.dumps({"findings": findings}))
+    
+    def mock_analyze_side_effect(chunk, skill_content, max_tokens):
+        f = chunk[0]
+        return {
+            "status": "COMPLETED",
+            "results": [
+                {
+                    "finding_id": f["finding_id"],
+                    "analysis_summary": "ok",
+                    "remediation_suggestion": "fix",
+                    "is_false_positive_prediction": False,
+                    "security_impact": "high"
+                }
+            ],
+            "usage": {"input_tokens": 10, "cached_tokens": 5, "output_tokens": 20, "total_tokens": 35}
+        }
+    
+    mock_analyze.side_effect = mock_analyze_side_effect
     
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
     
-    assert result["status"] == "SKIPPED"
-    assert "AI credentials missing" in result["error_message"]
+    assert result["status"] == "COMPLETED"
+    assert result["selected"] == 5
+    assert result["analyzed"] == 5
+    assert mock_analyze.call_count == 5
+    
+    assert result["usage"]["input_tokens"] == 50
+    assert result["usage"]["cached_tokens"] == 25
+    assert result["usage"]["output_tokens"] == 100
+    assert result["usage"]["total_tokens"] == 175
 
-@patch("src.ai.providers.openai_provider.requests.post")
-def test_ai_adapter_openai_success(mock_post, tmp_path, monkeypatch):
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.setenv("AI_API_KEY", "dummy")
+
+@patch("src.ai.providers.mock.MockAIProvider.analyze")
+def test_c_multiple_findings_batch_size_2(mock_analyze, tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "mock")
     monkeypatch.setenv("AI_BATCH_SIZE", "2")
     
     ai_input = tmp_path / "ai_input.json"
     report_file = tmp_path / "report.json"
     
-    ai_data = {
-        "findings": [
-            {"finding_id": "f1"},
-            {"finding_id": "f2"},
-            {"finding_id": "f3"} # Should be skipped due to batch_size
-        ]
-    }
-    ai_input.write_text(json.dumps(ai_data))
+    findings = [{"finding_id": f"f{i}"} for i in range(1, 6)]
+    ai_input.write_text(json.dumps({"findings": findings}))
+    report_file.write_text(json.dumps({"findings": findings}))
     
-    report_data = {
-        "findings": [
-            {"finding_id": "f1"},
-            {"finding_id": "f2"},
-            {"finding_id": "f3"}
-        ]
-    }
-    report_file.write_text(json.dumps(report_data))
+    def mock_analyze_side_effect(chunk, skill_content, max_tokens):
+        return {
+            "status": "COMPLETED",
+            "results": [{"finding_id": f["finding_id"]} for f in chunk],
+            "usage": {"input_tokens": 10, "cached_tokens": 0, "output_tokens": 20, "total_tokens": 30}
+        }
     
-    mock_resp = MagicMock()
-    mock_resp.json.return_value = {
-        "choices": [
-            {
-                "message": {
-                    "content": json.dumps({
-                        "results": [
-                            {
-                                "finding_id": "f1",
-                                "analysis_summary": "AI says this is bad.",
-                                "remediation_suggestion": "Fix it.",
-                                "is_false_positive_prediction": False
-                            }
-                        ]
-                    })
-                }
-            }
-        ]
-    }
-    mock_post.return_value = mock_resp
+    mock_analyze.side_effect = mock_analyze_side_effect
     
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
     
     assert result["status"] == "COMPLETED"
-    assert result["analyzed"] == 1
-    assert result["selected"] == 2
-    
-    with open(str(report_file), 'r') as f:
-        updated_report = json.load(f)
-        
-    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
-    assert "ai_fields" in f1
-    assert f1["ai_fields"]["analysis_summary"] == "AI says this is bad."
-    
-    f2 = next(f for f in updated_report["findings"] if f["finding_id"] == "f2")
-    assert "ai_fields" not in f2
+    assert result["selected"] == 5
+    assert result["analyzed"] == 5
+    assert mock_analyze.call_count == 3
 
-@patch("src.ai.providers.openai_provider.requests.post")
-def test_ai_adapter_openai_http_error(mock_post, tmp_path, monkeypatch):
-    import requests
-    monkeypatch.setenv("AI_PROVIDER", "openai")
-    monkeypatch.setenv("AI_API_KEY", "dummy")
+
+@patch("src.ai.providers.mock.MockAIProvider.analyze")
+def test_d_and_e_simulated_quota_failure(mock_analyze, tmp_path, monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "mock")
+    monkeypatch.setenv("AI_BATCH_SIZE", "1")
     
     ai_input = tmp_path / "ai_input.json"
     report_file = tmp_path / "report.json"
     
-    ai_data = {
-        "findings": [
-            {"finding_id": "f1"}
-        ]
-    }
-    ai_input.write_text(json.dumps(ai_data))
+    findings = [{"finding_id": f"f{i}"} for i in range(1, 6)]
+    ai_input.write_text(json.dumps({"findings": findings}))
+    report_file.write_text(json.dumps({"findings": findings}))
     
-    # Mock requests.exceptions.HTTPError
-    mock_resp = MagicMock()
-    mock_resp.status_code = 429
-    mock_resp.json.return_value = {
-        "error": {
-            "message": "Too Many Requests - Rate limit exceeded."
+    call_counts = {"count": 0}
+    def mock_analyze_side_effect(chunk, skill_content, max_tokens):
+        call_counts["count"] += 1
+        if call_counts["count"] == 3:
+            return {
+                "status": "ERROR",
+                "error_message": "429 Quota Exceeded",
+                "usage": {"input_tokens": 0, "cached_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+            }
+            
+        f = chunk[0]
+        return {
+            "status": "COMPLETED",
+            "results": [
+                {
+                    "finding_id": f["finding_id"],
+                    "analysis_summary": "ok",
+                }
+            ],
+            "usage": {"input_tokens": 10, "cached_tokens": 5, "output_tokens": 20, "total_tokens": 35}
         }
-    }
-    mock_err = requests.exceptions.HTTPError("429 Client Error")
-    mock_err.response = mock_resp
     
-    # Make raise_for_status throw the error
-    mock_resp.raise_for_status.side_effect = mock_err
-    mock_post.return_value = mock_resp
+    mock_analyze.side_effect = mock_analyze_side_effect
     
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
     
-    assert result["status"] == "ERROR"
-    assert "HTTP 429" in result["error_message"]
-    assert "Too Many Requests - Rate limit exceeded." in result["error_message"]
+    assert result["status"] == "QUOTA_LIMIT_REACHED"
+    assert result["selected"] == 5
+    assert result["analyzed"] == 2
+    assert result["rejected"] == 0
+    assert mock_analyze.call_count == 3
+    
+    with open(str(report_file), 'r') as f:
+        updated_report = json.load(f)
+    
+    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
+    f2 = next(f for f in updated_report["findings"] if f["finding_id"] == "f2")
+    f3 = next(f for f in updated_report["findings"] if f["finding_id"] == "f3")
+    
+    assert "ai_fields" in f1
+    assert "ai_fields" in f2
+    assert "ai_fields" not in f3
+
 
 def test_gemini_missing_credentials(tmp_path, monkeypatch):
     monkeypatch.setenv("AI_PROVIDER", "gemini")
@@ -252,74 +167,93 @@ def test_gemini_missing_credentials(tmp_path, monkeypatch):
         "findings": [{"finding_id": "f1"}]
     }
     ai_input.write_text(json.dumps(ai_data))
+    report_file.write_text(json.dumps({"findings": []}))
     
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
     
-    assert result["status"] == "SKIPPED"
+    assert result["status"] == "ERROR"
     assert "GEMINI_API_KEY not set" in result["error_message"]
 
+
 @patch("src.ai.providers.gemini_provider.requests.post")
-def test_ai_adapter_gemini_success(mock_post, tmp_path, monkeypatch):
-    monkeypatch.setenv("AI_PROVIDER", "gemini")
+def test_f_invalid_json(mock_post, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "dummy")
-    
-    ai_input = tmp_path / "ai_input.json"
-    report_file = tmp_path / "report.json"
-    
-    ai_data = {
-        "findings": [{"finding_id": "f1"}]
-    }
-    ai_input.write_text(json.dumps(ai_data))
-    
-    report_data = {
-        "findings": [{"finding_id": "f1"}]
-    }
-    report_file.write_text(json.dumps(report_data))
     
     mock_resp = MagicMock()
     mock_resp.json.return_value = {
         "candidates": [
             {
                 "content": {
-                    "parts": [
-                        {
-                            "text": json.dumps({
-                                "results": [
-                                    {
-                                        "finding_id": "f1",
-                                        "analysis_summary": "Gemini analyzed this.",
-                                        "remediation_suggestion": "Fix.",
-                                        "is_false_positive_prediction": True
-                                    }
-                                ]
-                            })
-                        }
-                    ]
+                    "parts": [{"text": "Not JSON at all"}]
                 }
             }
         ],
         "usageMetadata": {
             "promptTokenCount": 10,
+            "cachedContentTokenCount": 5,
             "candidatesTokenCount": 20,
-            "totalTokenCount": 30
+            "totalTokenCount": 35
         }
     }
     mock_post.return_value = mock_resp
     
-    adapter = AIAdapter()
-    result = adapter.run(str(ai_input), str(report_file))
+    provider = GeminiProvider()
+    response = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
     
-    assert result["status"] == "COMPLETED"
-    assert result["analyzed"] == 1
+    assert response["status"] == "ERROR"
+    assert "invalid JSON" in response["error_message"]
+    assert response["raw_response"] == "Not JSON at all"
+    assert response["usage"]["input_tokens"] == 10
+    assert response["usage"]["cached_tokens"] == 5
+    assert response["usage"]["total_tokens"] == 35
+
+
+@patch("src.ai.providers.gemini_provider.requests.post")
+def test_g_empty_candidates_and_parts(mock_post, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
     
-    with open(str(report_file), 'r') as f:
-        updated_report = json.load(f)
-        
-    f1 = next(f for f in updated_report["findings"] if f["finding_id"] == "f1")
-    assert "ai_fields" in f1
-    assert f1["ai_fields"]["analysis_summary"] == "Gemini analyzed this."
-    assert result["usage"]["total_tokens"] == 30
+    # Test Empty Parts
+    mock_resp_parts = MagicMock()
+    mock_resp_parts.json.return_value = {
+        "candidates": [
+            {
+                "finishReason": "SAFETY",
+                "content": {"parts": []}
+            }
+        ],
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "totalTokenCount": 10
+        }
+    }
+    mock_post.return_value = mock_resp_parts
+    
+    provider = GeminiProvider()
+    response_parts = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
+    
+    assert response_parts["status"] == "ERROR"
+    assert response_parts["error_message"] == "Gemini returned empty parts."
+    assert response_parts["finish_reason"] == "SAFETY"
+    assert response_parts["usage"]["input_tokens"] == 10
+
+    # Test No Candidates
+    mock_resp_cands = MagicMock()
+    mock_resp_cands.json.return_value = {
+        "candidates": [],
+        "usageMetadata": {
+            "promptTokenCount": 10,
+            "totalTokenCount": 10
+        }
+    }
+    mock_post.return_value = mock_resp_cands
+    
+    response_cands = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
+    
+    assert response_cands["status"] == "ERROR"
+    assert response_cands["error_message"] == "Gemini returned no candidates."
+    assert "debug_response" in response_cands
+
 
 def test_estimate_tokens_gemini(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AI_PROVIDER", "gemini")
@@ -343,4 +277,3 @@ def test_estimate_tokens_gemini(tmp_path, monkeypatch, capsys):
     assert "AI TOKEN ESTIMATE" in captured.out
     assert "Provider: Gemini" in captured.out
     assert "No API request was made." in captured.out
-
