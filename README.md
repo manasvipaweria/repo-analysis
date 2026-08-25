@@ -144,7 +144,7 @@ The orchestrator uses a provider-agnostic architecture. Set the following enviro
 
 **Gemini Provider (`AI_PROVIDER=gemini`)**
 - `GEMINI_API_KEY`: Your Gemini API key.
-- `GEMINI_MODEL`: The model to use (defaults to `gemini-1.5-flash`).
+- `GEMINI_MODEL`: The model to use (defaults to `gemini-3.5-flash`).
 
 **Mock Provider (`AI_PROVIDER=mock`)**
 No credentials required. Fast, deterministic, completely local response. The output explicitly labels itself as mock and does not represent a real security assessment.

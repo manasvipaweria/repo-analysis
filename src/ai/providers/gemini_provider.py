@@ -8,7 +8,7 @@ class GeminiProvider(AIProvider):
     def __init__(self):
         self.api_key = os.environ.get("GEMINI_API_KEY")
         # Ensure we default to a model that supports JSON mode and system instructions
-        self.model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+        self.model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
         
     def _build_url(self):
         return f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
