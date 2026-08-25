@@ -42,22 +42,33 @@ class GeminiProvider(AIProvider):
             
             result_json = response.json()
             
-            candidates = result_json.get("candidates", [])
-            if not candidates:
-                return {"status": "ERROR", "error_message": "Gemini returned no candidates."}
-                
-            content_parts = candidates[0].get("content", {}).get("parts", [])
-            if not content_parts:
-                return {"status": "ERROR", "error_message": "Gemini returned empty parts."}
-                
-            text_content = content_parts[0].get("text", "")
-            
             usage = result_json.get("usageMetadata", {})
             parsed_usage = {
                 "input_tokens": usage.get("promptTokenCount"),
                 "output_tokens": usage.get("candidatesTokenCount"),
                 "total_tokens": usage.get("totalTokenCount")
             } if usage else {"available": False}
+            
+            candidates = result_json.get("candidates", [])
+            if not candidates:
+                return {
+                    "status": "ERROR", 
+                    "error_message": "Gemini returned no candidates.",
+                    "debug_response": result_json,
+                    "usage": parsed_usage
+                }
+                
+            content_parts = candidates[0].get("content", {}).get("parts", [])
+            if not content_parts:
+                return {
+                    "status": "ERROR", 
+                    "error_message": "Gemini returned empty parts.",
+                    "finish_reason": candidates[0].get("finishReason"),
+                    "debug_candidate": candidates[0],
+                    "usage": parsed_usage
+                }
+                
+            text_content = content_parts[0].get("text", "")
             
             try:
                 ai_results = json.loads(text_content).get("results", [])
