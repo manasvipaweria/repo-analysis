@@ -26,6 +26,12 @@ class GeminiProvider(AIProvider):
                     "parts": [{"text": json.dumps({"findings": findings}, indent=2)}]
                 }
             ],
+            "safetySettings": [
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+            ],
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "maxOutputTokens": max_tokens
@@ -74,9 +80,17 @@ class GeminiProvider(AIProvider):
             try:
                 ai_results = json.loads(text_content).get("results", [])
             except json.JSONDecodeError as e:
+                finish_reason = candidates[0].get("finishReason")
+                err_msg = f"Gemini returned invalid JSON (finish_reason: {finish_reason}): {e}"
+                if finish_reason == "SAFETY":
+                    err_msg = "Gemini blocked the response due to safety filters."
+                elif finish_reason == "MAX_TOKENS":
+                    err_msg = "Gemini reached the max output token limit and was cut off."
+                    
                 return {
                     "status": "ERROR", 
-                    "error_message": f"Gemini returned invalid JSON: {e}",
+                    "error_message": err_msg,
+                    "finish_reason": finish_reason,
                     "raw_response": text_content,
                     "usage": parsed_usage
                 }

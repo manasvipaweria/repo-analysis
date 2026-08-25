@@ -115,6 +115,9 @@ class AIAdapter:
                 else:
                     final_status = "ERROR"
                 error_message = response.get("error_message")
+                print(f"[AI] Error: {error_message}")
+                if "raw_response" in response:
+                    print(f"[AI] Raw Response Snippet: {repr(response['raw_response'])[:200]}")
                 break
                 
             all_ai_results.extend(response.get("results", []))
