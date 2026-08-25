@@ -52,11 +52,6 @@ class GeminiProvider(AIProvider):
                 
             text_content = content_parts[0].get("text", "")
             
-            try:
-                ai_results = json.loads(text_content).get("results", [])
-            except json.JSONDecodeError as e:
-                return {"status": "ERROR", "error_message": f"Gemini returned invalid JSON: {e}"}
-                
             usage = result_json.get("usageMetadata", {})
             parsed_usage = {
                 "input_tokens": usage.get("promptTokenCount"),
@@ -64,6 +59,16 @@ class GeminiProvider(AIProvider):
                 "total_tokens": usage.get("totalTokenCount")
             } if usage else {"available": False}
             
+            try:
+                ai_results = json.loads(text_content).get("results", [])
+            except json.JSONDecodeError as e:
+                return {
+                    "status": "ERROR", 
+                    "error_message": f"Gemini returned invalid JSON: {e}",
+                    "raw_response": text_content,
+                    "usage": parsed_usage
+                }
+                
             return {
                 "status": "COMPLETED",
                 "results": ai_results,
