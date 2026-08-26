@@ -1,5 +1,5 @@
 import pytest
-from src.core.models import Finding, ToolResult, ToolStatus, CategoryStatus, Category, TestMetrics
+from src.core.models import Finding, ToolResult, ToolStatus, CategoryStatus, Category, TestMetrics, Report
 from src.core.dedup import deduplicate_findings
 from src.core.orchestrator import Orchestrator
 from src.core.output import write_csv_report
@@ -18,7 +18,7 @@ def test_deduplication():
     assert len(deduped) == 3
     
     # The first two should merge
-    merged = next(f for f in deduped if "hardcoded" in f.message.lower())
+    merged = next(f for f in deduped if "hardcoded" in f.description.lower())
     assert set(merged.detected_by) == {"bandit", "semgrep"}
     assert "B105" in merged.rule_id and "semgrep.hardcoded-password" in merged.rule_id
 
@@ -88,10 +88,49 @@ def test_csv_summary_generation(tmp_path):
     content = csv_file.read_text(encoding="utf-8")
     assert "SUMMARY,sec,PASSED,0" in content
     assert "SUMMARY,qual,ISSUES_FOUND,1" in content
+    
+    # Check headers
+    assert "Type,Finding ID,Status,Category,Priority,Severity,Merge Blocking,File,Line,Title,Description,Rule ID,Code Context,Detected By,AI Summary,Security Impact,Remediation,False Positive Prediction" in content
+    
+    # Check finding fields and trailing blank AI columns
     assert "FINDING," in content
     assert ",qual," in content
     assert ",low," in content
     assert ",b,2,r,m," in content
+    assert ",,,," in content # Blank AI columns at the end
+
+def test_report_from_dict():
+    # Test Report deserialization and AI field handling
+    data = {
+        "repo": "test_repo",
+        "timestamp": "2026-08-20T00:00:00Z",
+        "summary": {},
+        "findings": [
+            {
+                "finding_id": "123",
+                "category": "security",
+                "severity": "high",
+                "location": {"file": "app.py", "line": 42},
+                "evidence": {"code_context": "password='123'"},
+                "ai_fields": {
+                    "analysis_summary": "Found hardcoded password",
+                    "security_impact": "High",
+                    "remediation_suggestion": "Use env vars",
+                    "is_false_positive_prediction": False
+                }
+            }
+        ]
+    }
+    
+    rep = Report.from_dict(data)
+    assert rep.repo == "test_repo"
+    assert len(rep.findings) == 1
+    f = rep.findings[0]
+    assert f.finding_id == "123"
+    assert f.location.file == "app.py"
+    assert f.evidence.code_context == "password='123'"
+    assert f.ai_fields.analysis_summary == "Found hardcoded password"
+    assert f.ai_fields.is_false_positive_prediction is False
 
 import sys
 import subprocess

@@ -97,6 +97,12 @@ def main():
                     ai_result = ai_adapter.run(ai_input_file, json_file)
                     print(f"[*] AI Adapter Result: {ai_result}")
                     
+                    # Reload the enriched report from JSON so CSV output has AI fields
+                    import json
+                    from src.core.models import Report
+                    with open(json_file, 'r', encoding='utf-8') as f:
+                        report = Report.from_dict(json.load(f))
+                        
                 except ImportError as e:
                     print(f"[-] AI modules not found or failed to load: {e}")
                 except Exception as e:
