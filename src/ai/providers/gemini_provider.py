@@ -46,7 +46,7 @@ class GeminiProvider(AIProvider):
         }
         
         try:
-            response = requests.post(self._build_url(), json=payload, headers=headers, timeout=60)
+            response = requests.post(self._build_url(), json=payload, headers=headers, timeout=180)
             response.raise_for_status()
             
             result_json = response.json()
