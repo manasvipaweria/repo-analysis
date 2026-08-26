@@ -11,7 +11,7 @@ class AIAdapter:
     def __init__(self):
         self.provider_name = os.environ.get("AI_PROVIDER", "openai").lower()
         self.batch_size = int(os.environ.get("AI_BATCH_SIZE", "5"))
-        self.max_tokens = int(os.environ.get("AI_MAX_OUTPUT_TOKENS", "1000"))
+        self.max_tokens = int(os.environ.get("AI_MAX_OUTPUT_TOKENS", "4000"))
         
         if self.provider_name == "mock":
             self.provider = MockAIProvider()

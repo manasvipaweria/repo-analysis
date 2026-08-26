@@ -34,7 +34,10 @@ class GeminiProvider(AIProvider):
             ],
             "generationConfig": {
                 "responseMimeType": "application/json",
-                "maxOutputTokens": max_tokens
+                "maxOutputTokens": max_tokens,
+                "thinkingConfig": {
+                    "thinkingLevel": "MINIMAL"
+                }
             }
         }
         
@@ -53,9 +56,17 @@ class GeminiProvider(AIProvider):
                 "input_tokens": usage.get("promptTokenCount"),
                 "output_tokens": usage.get("candidatesTokenCount"),
                 "cached_tokens": usage.get("cachedContentTokenCount", 0),
+                "thoughts_tokens": usage.get("thoughtsTokenCount", 0),
                 "total_tokens": usage.get("totalTokenCount")
             } if usage else {"available": False}
-            
+
+            # --- DEBUG LOGGING ---
+            print("=== DEBUG: Gemini raw response inspection ===")
+            print("promptFeedback:", result_json.get("promptFeedback"))
+            print("thoughtsTokenCount:", usage.get("thoughtsTokenCount"))
+            print("thinkingConfig sent:", payload["generationConfig"].get("thinkingConfig"))
+            # --- END DEBUG LOGGING ---
+
             candidates = result_json.get("candidates", [])
             if not candidates:
                 return {
@@ -64,13 +75,18 @@ class GeminiProvider(AIProvider):
                     "debug_response": result_json,
                     "usage": parsed_usage
                 }
-                
+
+            print("finish_reason:", candidates[0].get("finishReason"))
+            print("safety_ratings:", candidates[0].get("safetyRatings"))
+            print("=== END DEBUG ===")
+
             content_parts = candidates[0].get("content", {}).get("parts", [])
             if not content_parts:
                 return {
                     "status": "ERROR", 
                     "error_message": "Gemini returned empty parts.",
                     "finish_reason": candidates[0].get("finishReason"),
+                    "safety_ratings": candidates[0].get("safetyRatings"),
                     "debug_candidate": candidates[0],
                     "usage": parsed_usage
                 }
