@@ -40,5 +40,5 @@ def test_react_doctor_adapter_success_with_findings(tmp_path):
         finding = result.findings[0]
         assert finding.category == Category.QUALITY.value
         assert finding.severity == "high"
-        assert finding.file == "src/App.jsx"
+        assert finding.location.file == "src/App.jsx"
         assert finding.rule_id == "react/jsx-key"

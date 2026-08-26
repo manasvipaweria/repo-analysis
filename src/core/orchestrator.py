@@ -96,15 +96,20 @@ class Orchestrator:
         import os
         for f in findings:
             # Code Context
-            if f.file and f.line > 0:
-                abs_path = os.path.join(repo_path, f.file)
+            file_path = f.location.file if f.location else None
+            line_num = f.location.line if f.location else None
+            
+            if file_path and line_num and line_num > 0:
+                abs_path = os.path.join(repo_path, file_path)
                 if os.path.isfile(abs_path):
                     try:
                         with open(abs_path, 'r', encoding='utf-8', errors='replace') as file_obj:
                             lines = file_obj.readlines()
-                            start = max(0, f.line - 3)
-                            end = min(len(lines), f.line + 2)
-                            f.code_context = "".join(lines[start:end])
+                            start = max(0, line_num - 3)
+                            end = min(len(lines), line_num + 2)
+                            if not f.evidence:
+                                f.evidence = __import__('src.core.models', fromlist=['FindingEvidence']).FindingEvidence()
+                            f.evidence.code_context = "".join(lines[start:end])
                     except Exception:
                         pass
             

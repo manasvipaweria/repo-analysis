@@ -58,6 +58,6 @@ def test_sonarqube_adapter_success(tmp_path):
         finding = result.findings[0]
         assert finding.category == Category.SECURITY.value
         assert finding.severity == "high"
-        assert finding.file == "src/main.js"
+        assert finding.location.file == "src/main.js"
         assert finding.rule_id == "javascript:S1523"
-        assert finding.line == 10
+        assert finding.location.line == 10

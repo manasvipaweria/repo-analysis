@@ -78,9 +78,9 @@ def test_snyk_adapter_success_with_vulns(tmp_path, monkeypatch):
         finding = result.findings[0]
         assert finding.category == Category.DEPENDENCIES.value
         assert finding.severity == "high"
-        assert finding.file == "package.json"
+        assert finding.location.file == "package.json"
         assert finding.rule_id == "CVE-2019-10744"
-        assert "Prototype Pollution" in finding.message
+        assert "Prototype Pollution" in finding.description
         
 def test_snyk_adapter_execution_error(tmp_path, monkeypatch):
     (tmp_path / "package.json").write_text("{}")

@@ -174,3 +174,45 @@ def test_subprocess_encoding_handling(tmp_path):
     # \x90 and \xff are invalid UTF-8, so they should be replaced with the replacement character U+FFFD
     assert "\ufffd" in result.stdout
     assert "invalid" in result.stdout
+
+def test_enrich_findings(tmp_path):
+    # Setup dummy repo file
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    test_file = repo_dir / "test.py"
+    test_file.write_text("line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\n")
+    
+    findings = [
+        # Normal finding with code context enrichment expected
+        Finding(Category.SECURITY.value, "high", "test.py", 4, "msg", "rule1"),
+        # Finding with None location
+        Finding(Category.SECURITY.value, "high", None, None, "msg", "rule2"),
+        # Finding with no line
+        Finding(Category.SECURITY.value, "high", "test.py", None, "msg", "rule3"),
+        # Finding for missing file
+        Finding(Category.SECURITY.value, "high", "missing.py", 4, "msg", "rule4"),
+    ]
+    
+    # Strip location completely from one finding
+    findings[1].location = None
+    
+    orch = Orchestrator([])
+    orch.enrich_findings(findings, str(repo_dir))
+    
+    # Verify enrichment logic
+    
+    # 1. Normal finding should have code context loaded
+    assert findings[0].evidence.code_context == "line 2\nline 3\nline 4\nline 5\nline 6\n"
+    assert findings[0].priority == "P1"
+    assert findings[0].merge_blocking is True
+    
+    # 2. None location finding should not crash and should still get severity logic
+    assert findings[1].evidence.code_context is None
+    assert findings[1].priority == "P1"
+    
+    # 3. No line finding should not have context loaded
+    assert findings[2].evidence.code_context is None
+    
+    # 4. Missing file finding should not have context loaded
+    assert findings[3].evidence.code_context is None
+

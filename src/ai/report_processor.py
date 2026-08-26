@@ -54,27 +54,32 @@ def process_report(input_file: str, output_file: str) -> None:
     
     ai_findings = []
     for raw_finding in report_data.get("findings", []):
+        location = raw_finding.get("location", {})
+        evidence = raw_finding.get("evidence", {})
+        
         ai_finding = {
             "finding_id": raw_finding.get("finding_id"),
+            "status": raw_finding.get("status"),
             "category": raw_finding.get("category"),
             "severity": raw_finding.get("severity"),
             "priority": raw_finding.get("priority"),
-            "file": raw_finding.get("file"),
+            "title": raw_finding.get("title"),
+            "file": location.get("file"),
             "rule_id": raw_finding.get("rule_id"),
             "detected_by": raw_finding.get("detected_by"),
             "merge_blocking": raw_finding.get("merge_blocking")
         }
         
-        if "line" in raw_finding and raw_finding["line"] > 0:
-            ai_finding["line"] = raw_finding["line"]
+        if location.get("line") is not None and location.get("line") > 0:
+            ai_finding["line"] = location["line"]
             
         if "confidence" in raw_finding and raw_finding["confidence"]:
             ai_finding["confidence"] = raw_finding["confidence"]
             
         # Redact secrets in message and code context
-        ai_finding["message"] = redact_secrets(raw_finding.get("message", ""))
+        ai_finding["message"] = redact_secrets(raw_finding.get("description", ""))
         
-        context = raw_finding.get("code_context")
+        context = evidence.get("code_context")
         if context:
             ai_finding["code_context"] = redact_secrets(context)
             

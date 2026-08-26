@@ -57,5 +57,5 @@ def test_depcruise_adapter_success_with_vulns(tmp_path):
         finding = result.findings[0]
         assert finding.category == Category.ARCHITECTURE.value
         assert finding.severity == "high"
-        assert finding.file == "src/index.js"
+        assert finding.location.file == "src/index.js"
         assert finding.rule_id == "no-forbidden"
