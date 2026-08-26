@@ -9,6 +9,9 @@ on:
         type: string
         default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor'
     secrets:
+      GEMINI_API_KEY:
+        description: 'Gemini API Key'
+        required: true
       SNYK_TOKEN:
         description: 'Snyk API Token'
         required: false
@@ -72,13 +75,18 @@ jobs:
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          AI_PROVIDER: gemini
+          GEMINI_MODEL: gemini-3.5-flash
+          AI_BATCH_SIZE: "5"
+          AI_MAX_OUTPUT_TOKENS: "4000"
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
           VDB_HOME: ${{ github.workspace }}/.vdb
           DEPSCAN_AUTO_DOWNLOAD: 'false'
         run: |
           cd target-repo
           rm -f report.json report.csv
-          python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --output json,csv
+          python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --output json,csv --run-ai
         
       - name: Upload analysis reports
         if: always()
