@@ -11,16 +11,33 @@ def test_deduplication():
         Finding(Category.SECURITY.value, "high", "app.py", 10, "Use of hardcoded password", "B105", ["bandit"]),
         Finding(Category.SECURITY.value, "high", "app.py", 10, "Hardcoded password detected", "semgrep.hardcoded-password", ["semgrep"]),
         Finding(Category.QUALITY.value, "medium", "app.py", 10, "Line too long", "E501", ["ruff"]),
-        Finding(Category.SECURITY.value, "medium", "app.py", 20, "Weak hashing", "B303", ["bandit"])
+        Finding(Category.SECURITY.value, "medium", "app.py", 20, "Weak hashing", "B303", ["bandit"]),
+        
+        # Findings with missing location data to test robust dedup
+        Finding(Category.SECURITY.value, "high", None, None, "Global security issue", "GLOBAL-1", ["tool1"]),
+        Finding(Category.SECURITY.value, "high", None, None, "Global security issue", "GLOBAL-1", ["tool2"]),
+        Finding(Category.SECURITY.value, "high", "file.py", None, "File-level issue", "FILE-1", ["tool1"]),
+        Finding(Category.SECURITY.value, "high", "file.py", None, "File-level issue", "FILE-1", ["tool2"])
     ]
     
+    # We manually strip location from one to completely simulate missing location object
+    findings[4].location = None
+    findings[5].location = None
+    
     deduped = deduplicate_findings(findings)
-    assert len(deduped) == 3
+    assert len(deduped) == 5
     
     # The first two should merge
     merged = next(f for f in deduped if "hardcoded" in f.description.lower())
     assert set(merged.detected_by) == {"bandit", "semgrep"}
     assert "B105" in merged.rule_id and "semgrep.hardcoded-password" in merged.rule_id
+    
+    # The missing-location findings should merge
+    merged_global = next(f for f in deduped if "Global" in f.description)
+    assert set(merged_global.detected_by) == {"tool1", "tool2"}
+    
+    merged_file = next(f for f in deduped if "File-level" in f.description)
+    assert set(merged_file.detected_by) == {"tool1", "tool2"}
 
 class MockAdapter(BaseAdapter):
     def __init__(self, name, cats, status, findings=None, error_msg=None):

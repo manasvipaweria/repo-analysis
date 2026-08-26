@@ -18,7 +18,12 @@ def jaccard_similarity(set1: set, set2: set) -> float:
     return intersection / union if union > 0 else 0.0
 
 def is_duplicate(f1: Finding, f2: Finding) -> bool:
-    if f1.file != f2.file or f1.line != f2.line or f1.category != f2.category:
+    f1_file = f1.location.file if f1.location else None
+    f2_file = f2.location.file if f2.location else None
+    f1_line = f1.location.line if f1.location else None
+    f2_line = f2.location.line if f2.location else None
+    
+    if f1_file != f2_file or f1_line != f2_line or f1.category != f2.category:
         return False
     
     # Exact rule ID match
@@ -38,8 +43,8 @@ def is_duplicate(f1: Finding, f2: Finding) -> bool:
         return False
         
     # Heuristic: message similarity
-    words1 = extract_words(f1.message)
-    words2 = extract_words(f2.message)
+    words1 = extract_words(f1.description)
+    words2 = extract_words(f2.description)
     
     if jaccard_similarity(words1, words2) > 0.4:
         return True
