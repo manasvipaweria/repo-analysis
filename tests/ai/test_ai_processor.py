@@ -277,3 +277,85 @@ def test_estimate_tokens_gemini(tmp_path, monkeypatch, capsys):
     assert "AI TOKEN ESTIMATE" in captured.out
     assert "Provider: Gemini" in captured.out
     assert "No API request was made." in captured.out
+
+import requests
+
+@patch("src.ai.providers.gemini_provider.time.sleep")
+@patch("src.ai.providers.gemini_provider.requests.post")
+def test_h_gemini_retry_503_success(mock_post, mock_sleep, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    
+    # 1st call: 503
+    mock_503 = MagicMock()
+    mock_503.raise_for_status.side_effect = requests.exceptions.HTTPError(response=MagicMock(status_code=503))
+    mock_503.status_code = 503
+    
+    # 2nd call: success
+    mock_success = MagicMock()
+    mock_success.json.return_value = {
+        "candidates": [{"content": {"parts": [{"text": '{"results": [{"finding_id": "f1"}]}'}]}}]
+    }
+    mock_success.raise_for_status.return_value = None
+    
+    mock_post.side_effect = [mock_503, mock_success]
+    
+    provider = GeminiProvider()
+    response = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
+    
+    assert response["status"] == "COMPLETED"
+    assert response["results"][0]["finding_id"] == "f1"
+    assert mock_post.call_count == 2
+    mock_sleep.assert_called_once_with(2.0) # base_delay * 2^0
+
+
+@patch("src.ai.providers.gemini_provider.time.sleep")
+@patch("src.ai.providers.gemini_provider.requests.post")
+def test_i_gemini_retry_429_success(mock_post, mock_sleep, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    
+    mock_429 = MagicMock()
+    mock_429.raise_for_status.side_effect = requests.exceptions.HTTPError(response=MagicMock(status_code=429))
+    mock_429.status_code = 429
+    
+    mock_success = MagicMock()
+    mock_success.json.return_value = {
+        "candidates": [{"content": {"parts": [{"text": '{"results": [{"finding_id": "f1"}]}'}]}}]
+    }
+    mock_success.raise_for_status.return_value = None
+    
+    mock_post.side_effect = [mock_429, mock_429, mock_success]
+    
+    provider = GeminiProvider()
+    response = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
+    
+    assert response["status"] == "COMPLETED"
+    assert mock_post.call_count == 3
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_any_call(2.0)
+    mock_sleep.assert_any_call(4.0)
+
+
+@patch("src.ai.providers.gemini_provider.time.sleep")
+@patch("src.ai.providers.gemini_provider.requests.post")
+def test_j_gemini_retry_503_exhausted(mock_post, mock_sleep, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "dummy")
+    
+    mock_error_resp = MagicMock()
+    mock_error_resp.status_code = 503
+    mock_error_resp.json.return_value = {"error": {"message": "Service Unavailable"}}
+    mock_error_resp.text = '{"error": {"message": "Service Unavailable"}}'
+    
+    mock_503 = MagicMock()
+    mock_503.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_error_resp)
+    mock_503.status_code = 503
+    
+    # 4 calls total: 1 initial + 3 retries
+    mock_post.side_effect = [mock_503, mock_503, mock_503, mock_503]
+    
+    provider = GeminiProvider()
+    response = provider.analyze([{"finding_id": "f1"}], "skill", 1000)
+    
+    assert response["status"] == "ERROR"
+    assert "AI API request failed (HTTP 503): Service Unavailable" in response["error_message"]
+    assert mock_post.call_count == 4
+    assert mock_sleep.call_count == 3
