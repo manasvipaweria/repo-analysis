@@ -18,6 +18,8 @@ from src.adapters.depscan_adapter import DepScanAdapter
 from src.adapters.depcruise_adapter import DepcruiseAdapter
 from src.adapters.sonarqube_adapter import SonarQubeAdapter
 from src.adapters.react_doctor_adapter import ReactDoctorAdapter
+from src.adapters.codex_security_adapter import CodexSecurityAdapter
+from src.adapters.codex_architecture_adapter import CodexArchitectureAdapter
 
 ALL_ADAPTERS = {
     "ruff": RuffAdapter(),
@@ -31,7 +33,9 @@ ALL_ADAPTERS = {
     "dep-scan": DepScanAdapter(),
     "dependency-cruiser": DepcruiseAdapter(),
     "sonarqube": SonarQubeAdapter(),
-    "react-doctor": ReactDoctorAdapter()
+    "react-doctor": ReactDoctorAdapter(),
+    "codex-security": CodexSecurityAdapter(),
+    "codex-architecture": CodexArchitectureAdapter()
 }
 
 def main():

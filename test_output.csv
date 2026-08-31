@@ -1,0 +1,5 @@
+Type,Category,Status,Finding Count,Metrics / Info
+SUMMARY,security,ISSUES_FOUND,1,
+
+Type,Finding ID,Status,Category,Priority,Severity,Merge Blocking,File,Line,Title,Description,Rule ID,Code Context,Detected By
+FINDING,6952dc66-72fb-48fb-999b-69a55f5eb755,OPEN,security,P3,high,False,a.py,10,r1,msg,r1,,

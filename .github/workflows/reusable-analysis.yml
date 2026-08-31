@@ -8,10 +8,18 @@ on:
         required: false
         type: string
         default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor'
+      enable_codex:
+        description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
+        required: false
+        type: boolean
+        default: false
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
         required: true
+      OPENAI_API_KEY:
+        description: 'OpenAI API Key for Codex scanners'
+        required: false
       SNYK_TOKEN:
         description: 'Snyk API Token'
         required: false
@@ -76,6 +84,7 @@ jobs:
         id: analyze
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           AI_PROVIDER: gemini
           GEMINI_MODEL: gemini-3.5-flash
           AI_BATCH_SIZE: "5"
@@ -86,7 +95,14 @@ jobs:
         run: |
           cd target-repo
           rm -f report.json report.csv
-          python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --output json,csv --run-ai
+          
+          # Construct tools list
+          TOOLS="${{ inputs.tools }}"
+          if [ "${{ inputs.enable_codex }}" == "true" ]; then
+            TOOLS="$TOOLS,codex-security,codex-architecture"
+          fi
+          
+          python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --tools $TOOLS --output json,csv --run-ai
         
       - name: Upload analysis reports
         if: always()
