@@ -2,7 +2,6 @@ import os
 import subprocess
 import json
 import uuid
-import openai
 from typing import List, Dict, Any
 
 from src.core.models import Finding, FindingLocation, FindingEvidence, ToolResult, ToolStatus, Category
@@ -57,24 +56,24 @@ class ApniMandiDesignAdapter(BaseAdapter):
 
     def _run_ai_semantic(self, repo_path: str) -> List[Finding]:
         # Semantic checks via AI if requested
-        # For this to run, we must have OPENAI_API_KEY and ENABLE_DESIGN_AI="true"
-        api_key = os.environ.get("OPENAI_API_KEY")
+        # For this to run, we must have GEMINI_API_KEY and ENABLE_DESIGN_AI="true"
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             return []
             
         try:
-            client = openai.OpenAI(api_key=api_key)
+            import requests
             # Find main page files to review
             pages_context = ""
             for root, _, files in os.walk(repo_path):
                 if "node_modules" in root or ".next" in root:
                     continue
                 for file in files:
-                    if file.endswith("page.tsx") or file.endswith("page.jsx"):
+                    if file.endswith("page.tsx") or file.endswith("page.jsx") or file.endswith("layout.tsx"):
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, repo_path)
                         with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read()[:5000] # bounded
+                            content = f.read()[:20000] # Bounded, but larger for Gemini
                             pages_context += f"\n--- {rel_path} ---\n{content}\n"
                             
             if not pages_context.strip():
@@ -99,20 +98,39 @@ class ApniMandiDesignAdapter(BaseAdapter):
                 f"Context:\n{pages_context}"
             )
             
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                response_format={ "type": "json_object" },
-                messages=[
-                    {"role": "system", "content": "You enforce strict UI design semantic rules."},
-                    {"role": "user", "content": prompt}
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            payload = {
+                "system_instruction": {
+                    "parts": [{"text": "You enforce strict UI design semantic rules."}]
+                },
+                "contents": [
+                    {"parts": [{"text": prompt}]}
                 ],
-                max_tokens=1500,
-                temperature=0.1
-            )
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.1
+                }
+            }
             
-            data = json.loads(response.choices[0].message.content)
+            response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+            if response.status_code != 200:
+                print(f"[{self.tool_name}] Gemini API error: {response.status_code} {response.text}")
+                return []
+                
+            data = response.json()
+            
+            # Token Tracking & Logging
+            usage = data.get("usageMetadata", {})
+            input_tokens = usage.get("promptTokenCount", 0)
+            output_tokens = usage.get("candidatesTokenCount", 0)
+            print(f"[{self.tool_name}] AI Token Usage - Input: {input_tokens} | Output: {output_tokens} | Total: {input_tokens + output_tokens}")
+            
+            # Parse Response
+            text_response = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
+            result_json = json.loads(text_response)
+            
             findings = []
-            for f in data.get("findings", []):
+            for f in result_json.get("findings", []):
                 findings.append(Finding(
                     category=Category.QUALITY.value,
                     severity="info",
