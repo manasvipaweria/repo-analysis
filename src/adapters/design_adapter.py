@@ -55,9 +55,9 @@ class ApniMandiDesignAdapter(BaseAdapter):
             
         return findings
 
-    def _run_gemini_semantic(self, repo_path: str) -> List[Finding]:
+    def _run_ai_semantic(self, repo_path: str) -> List[Finding]:
         # Semantic checks via AI if requested
-        # For this to run, we must have OPENAI_API_KEY (or GEMINI) and ENABLE_DESIGN_AI="true"
+        # For this to run, we must have OPENAI_API_KEY and ENABLE_DESIGN_AI="true"
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return []
@@ -137,7 +137,7 @@ class ApniMandiDesignAdapter(BaseAdapter):
         # 2. Run Semantic (only if feature flag is ON)
         semantic_findings = []
         if os.environ.get("ENABLE_DESIGN_AI") == "true":
-            semantic_findings = self._run_gemini_semantic(repo_path)
+            semantic_findings = self._run_ai_semantic(repo_path)
             
         all_findings = static_findings + semantic_findings
         
