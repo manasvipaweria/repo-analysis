@@ -21,7 +21,7 @@ on:
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
-        required: true
+        required: false
       OPENAI_API_KEY:
         description: 'OpenAI API Key for Codex scanners'
         required: false
