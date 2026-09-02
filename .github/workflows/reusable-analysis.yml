@@ -7,9 +7,14 @@ on:
         description: 'Comma-separated list of tools to run'
         required: false
         type: string
-        default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor'
+        default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor,apnimandi-design'
       enable_codex:
         description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
+        required: false
+        type: boolean
+        default: false
+      enable_design_ai:
+        description: 'Enable AI Semantic Design Checks for frontend repos'
         required: false
         type: boolean
         default: false
@@ -92,6 +97,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
           VDB_HOME: ${{ github.workspace }}/.vdb
           DEPSCAN_AUTO_DOWNLOAD: 'false'
+          ENABLE_DESIGN_AI: ${{ inputs.enable_design_ai }}
         run: |
           cd target-repo
           rm -f report.json report.csv

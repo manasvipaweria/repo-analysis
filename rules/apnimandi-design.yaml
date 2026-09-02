@@ -1,0 +1,35 @@
+rules:
+  - id: apnimandi-no-raw-hex
+    message: "Consume tokens, never hexes. Do not use raw hex colors in Tailwind classes."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: ERROR
+    pattern-regex: 'className=["''`][^"''`]*(bg|text|border|ring)-\[#[0-9a-fA-F]+\]'
+  
+  - id: apnimandi-strict-icon-library
+    message: "Use lucide-react for icons. Other icon libraries like react-icons or heroicons are banned by the design system."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: import ... from 'react-icons/...';
+          - pattern: import ... from '@heroicons/...';
+          - pattern: import ... from 'react-icons';
+          - pattern: import ... from '@heroicons';
+
+  - id: apnimandi-button-height-override
+    message: "Do not shrink Button tap targets below 44px. Overriding height with h-8, h-10, etc., is banned."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: ERROR
+    pattern-regex: '<Button[^>]*className=["''`][^"''`]*\b(h-10|h-8|h-9|h-6|h-[0-9]|max-h-10|max-h-8|h-px)\b'
+
+  - id: apnimandi-rate-board-bg
+    message: "Do not manually construct Rate Boards using raw bg-board or #132A1D. Use the unified <RateBoard> component."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: ERROR
+    pattern-regex: 'className=["''`][^"''`]*\b(bg-board)\b'
+
+  - id: apnimandi-tabular-prices
+    message: "Prices must be tabular. If rendering a price string, ensure it has the .tabular class or data-slot='price'."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: WARNING
+    pattern-regex: '>\s*\$[0-9]+\.[0-9]{2}\s*<'
