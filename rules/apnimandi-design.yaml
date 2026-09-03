@@ -5,6 +5,12 @@ rules:
     severity: ERROR
     pattern-regex: 'className=["''`][^"''`]*(bg|text|border|ring)-\[#[0-9a-fA-F]+\]'
   
+  - id: apnimandi-no-inline-hex
+    message: "Consume tokens, never hexes. Do not use raw hex colors in inline style props."
+    languages: [javascript, typescript, jsx, tsx]
+    severity: ERROR
+    pattern-regex: 'style=\{\{.*#[0-9a-fA-F]{3,8}.*\}\}'
+  
   - id: apnimandi-strict-icon-library
     message: "Use lucide-react for icons. Other icon libraries like react-icons or heroicons are banned by the design system."
     languages: [javascript, typescript, jsx, tsx]
