@@ -80,18 +80,21 @@ class ApniMandiDesignAdapter(BaseAdapter):
                 return []
                 
             prompt = (
-                "You are an expert design system reviewer enforcing the Apni Mandi Design System.\n"
-                "Analyze the following React page components for semantic design violations.\n"
-                "Focus on: 1) Multiple primary buttons in one view. 2) Using Mandi Green (primary) for generic success alerts. "
-                "3) Using Mirchi (destructive) for non-critical alerts. 4) Bad copywriting (using 'Submit' instead of descriptive actions).\n\n"
+                "You are a strict UI Design System enforcer reviewing legacy React code.\n"
+                "Your job is to aggressively FIND design system violations in the provided code.\n"
+                "FLAG THE FOLLOWING VIOLATIONS:\n"
+                "1. ANY use of inline styles (e.g. style={{ background: '#...' }}). All styling must use CSS classes or Tailwind.\n"
+                "2. ANY use of raw HTML <button> tags instead of a unified <Button> component.\n"
+                "3. Multiple primary action buttons in the same view.\n"
+                "4. Bad copywriting (e.g. using generic words like 'Submit' instead of descriptive actions).\n\n"
                 "Return a structured JSON object exactly like this:\n"
                 "{\n"
                 '  "findings": [\n'
                 "    {\n"
                 '      "file": "path",\n'
                 '      "line": 10,\n'
-                '      "message": "Found multiple primary buttons...",\n'
-                '      "rule_id": "ai-semantic-buttons"\n'
+                '      "message": "Found raw HTML <button> tag. Must use unified <Button> component.",\n'
+                '      "rule_id": "ai-semantic-legacy-element"\n'
                 "    }\n"
                 "  ]\n"
                 "}\n\n"
