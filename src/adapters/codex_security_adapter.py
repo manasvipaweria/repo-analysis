@@ -40,7 +40,7 @@ class CodexSecurityAdapter(BaseAdapter):
             if result.returncode != 0:
                 err_out = result.stderr.lower() + result.stdout.lower()
                 # If access/auth fails, CLI usually returns a non-zero code and logs the error
-                if any(k in err_out for k in ["unauthorized", "forbidden", "access denied", "401", "403"]):
+                if any(k in err_out for k in ["unauthorized", "forbidden", "access denied", "http 401", "http 403"]):
                     return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message=f"Account lacks access (Auth error: {result.stderr.strip()[:100]})")
                 # Sometimes it outputs JSON even on error, we can try to parse stdout
                 if not result.stdout.strip():
