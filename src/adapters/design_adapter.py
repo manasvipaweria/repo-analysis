@@ -69,7 +69,7 @@ class ApniMandiDesignAdapter(BaseAdapter):
                 if "node_modules" in root or ".next" in root:
                     continue
                 for file in files:
-                    if file.endswith("page.tsx") or file.endswith("page.jsx") or file.endswith("layout.tsx"):
+                    if file.endswith("page.tsx") or file.endswith("page.jsx") or file.endswith("layout.tsx") or file.endswith("App.jsx") or file.endswith("App.tsx"):
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, repo_path)
                         with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
