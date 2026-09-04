@@ -54,29 +54,47 @@ class ApniMandiDesignAdapter(BaseAdapter):
             
         return findings
 
+    # Case-insensitive suffixes covering Next.js, CRA, Vite, and plain JS conventions
+    DESIGN_FILE_SUFFIXES = (
+        "page.tsx", "page.jsx", "page.js",
+        "layout.tsx", "layout.jsx", "layout.js",
+        "app.jsx", "app.tsx", "app.js",
+    )
+
     def _run_ai_semantic(self, repo_path: str) -> List[Finding]:
         # Semantic checks via AI if requested
         # For this to run, we must have GEMINI_API_KEY and ENABLE_DESIGN_AI="true"
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
+            print(f"[{self.tool_name}] GEMINI_API_KEY not set — skipping AI semantic check")
             return []
             
         try:
             import requests
-            # Find main page files to review
+            # Find main page/app files — case-insensitive, covers .js/.jsx/.tsx
             pages_context = ""
+            matched_files = []
             for root, _, files in os.walk(repo_path):
-                if "node_modules" in root or ".next" in root:
+                skip_dirs = ["node_modules", ".next", "dist", "build", "coverage", "__tests__", ".git"]
+                if any(d in root for d in skip_dirs):
                     continue
                 for file in files:
-                    if file.endswith("page.tsx") or file.endswith("page.jsx") or file.endswith("layout.tsx") or file.endswith("App.jsx") or file.endswith("App.tsx"):
+                    if file.lower().endswith(self.DESIGN_FILE_SUFFIXES):
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, repo_path)
-                        with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read()[:20000] # Bounded, but larger for Gemini
+                        matched_files.append(rel_path)
+                        with open(full_path, "r", encoding="utf-8", errors="ignore") as fh:
+                            raw = fh.read()
+                            if len(raw) > 20000:
+                                print(f"[{self.tool_name}] File {rel_path} truncated to 20000 chars (actual: {len(raw)} chars)")
+                            content = raw[:20000]
                             pages_context += f"\n--- {rel_path} ---\n{content}\n"
-                            
+
+            # Explicit log so discovery failures are visible in CI logs
+            print(f"[{self.tool_name}] Design files discovered: {matched_files if matched_files else 'NONE'}")
+
             if not pages_context.strip():
+                print(f"[{self.tool_name}] No matching design files found under {repo_path} — skipping AI semantic check")
                 return []
                 
             prompt = (
@@ -128,9 +146,26 @@ class ApniMandiDesignAdapter(BaseAdapter):
             output_tokens = usage.get("candidatesTokenCount", 0)
             print(f"[{self.tool_name}] AI Token Usage - Input: {input_tokens} | Output: {output_tokens} | Total: {input_tokens + output_tokens}")
             
-            # Parse Response
-            text_response = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}")
-            result_json = json.loads(text_response)
+            # Safe response parsing — guard against safety-filtered/malformed candidates
+            candidates = data.get("candidates", [])
+            if not candidates:
+                print(f"[{self.tool_name}] Gemini returned no candidates (possible safety filter). Raw: {data}")
+                return []
+            candidate = candidates[0]
+            finish_reason = candidate.get("finishReason", "UNKNOWN")
+            if finish_reason not in ("STOP", "MAX_TOKENS"):
+                print(f"[{self.tool_name}] Unexpected finishReason: {finish_reason}. Skipping.")
+                return []
+            parts = candidate.get("content", {}).get("parts", [])
+            if not parts:
+                print(f"[{self.tool_name}] Gemini candidate had empty parts. Raw: {candidate}")
+                return []
+            text_response = parts[0].get("text", "{}")
+            try:
+                result_json = json.loads(text_response)
+            except json.JSONDecodeError as je:
+                print(f"[{self.tool_name}] Failed to parse Gemini JSON: {je}. Raw: {text_response[:500]}")
+                return []
             
             findings = []
             for f in result_json.get("findings", []):
