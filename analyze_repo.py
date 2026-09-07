@@ -21,6 +21,7 @@ from src.adapters.react_doctor_adapter import ReactDoctorAdapter
 from src.adapters.codex_security_adapter import CodexSecurityAdapter
 from src.adapters.codex_architecture_adapter import CodexArchitectureAdapter
 from src.adapters.design_adapter import ApniMandiDesignAdapter
+from src.adapters.deslint_adapter import DeslintAdapter
 
 ALL_ADAPTERS = {
     "ruff": RuffAdapter(),
@@ -38,6 +39,7 @@ ALL_ADAPTERS = {
     "codex-security": CodexSecurityAdapter(),
     "codex-architecture": CodexArchitectureAdapter(),
     "apnimandi-design": ApniMandiDesignAdapter(),
+    "deslint": DeslintAdapter(),
 }
 
 def main():
