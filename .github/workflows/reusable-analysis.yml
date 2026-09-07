@@ -18,6 +18,11 @@ on:
         required: false
         type: boolean
         default: true
+      enable_deslint:
+        description: 'Enable Deslint React UI Consistency analysis'
+        required: false
+        type: boolean
+        default: false
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
@@ -98,6 +103,7 @@ jobs:
           VDB_HOME: ${{ github.workspace }}/.vdb
           DEPSCAN_AUTO_DOWNLOAD: 'false'
           ENABLE_DESIGN_AI: ${{ inputs.enable_design_ai }}
+          ENABLE_DESLINT: ${{ inputs.enable_deslint }}
         run: |
           cd target-repo
           rm -f report.json report.csv
@@ -106,6 +112,9 @@ jobs:
           TOOLS="${{ inputs.tools }}"
           if [ "${{ inputs.enable_codex }}" == "true" ]; then
             TOOLS="$TOOLS,codex-security,codex-architecture"
+          fi
+          if [ "${{ inputs.enable_deslint }}" == "true" ]; then
+            TOOLS="$TOOLS,deslint"
           fi
           
           python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --tools $TOOLS --output json,csv --run-ai
