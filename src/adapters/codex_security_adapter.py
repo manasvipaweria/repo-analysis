@@ -44,7 +44,7 @@ class CodexSecurityAdapter(BaseAdapter):
                     return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message=f"Account lacks access (Auth error: {result.stderr.strip()[:100]})")
                 # Sometimes it outputs JSON even on error, we can try to parse stdout
                 if not result.stdout.strip():
-                    return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message=f"CLI failed with code {result.returncode}. Stderr: {result.stderr[:200]}")
+                    return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message=f"CLI failed with code {result.returncode}. Stderr: {result.stderr[-200:]}")
                     
             try:
                 # Isolate JSON from possible npx warnings
