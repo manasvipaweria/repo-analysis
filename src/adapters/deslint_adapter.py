@@ -43,7 +43,8 @@ export default [
       'deslint/no-arbitrary-spacing': 'warn',
       'deslint/no-arbitrary-typography': 'warn',
       'deslint/responsive-required': 'warn',
-      'deslint/missing-states': 'off'
+      'deslint/missing-states': 'off',
+      'deslint/no-default-checked': 'warn'
     },
     languageOptions: {
       parserOptions: {

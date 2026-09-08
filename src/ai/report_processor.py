@@ -76,6 +76,9 @@ def process_report(input_file: str, output_file: str) -> None:
         if "confidence" in raw_finding and raw_finding["confidence"]:
             ai_finding["confidence"] = raw_finding["confidence"]
             
+        if "gdpr_references" in raw_finding and raw_finding["gdpr_references"]:
+            ai_finding["gdpr_references"] = raw_finding["gdpr_references"]
+            
         # Redact secrets in message and code context
         ai_finding["message"] = redact_secrets(raw_finding.get("description", ""))
         
@@ -85,14 +88,15 @@ def process_report(input_file: str, output_file: str) -> None:
             
         ai_findings.append(ai_finding)
         
-    ai_input = {
+    ai_output_data = {
         "repository": report_data.get("repo"),
         "analysis_timestamp": report_data.get("timestamp"),
-        "findings": ai_findings
+        "findings": ai_findings,
+        "data_flow": report_data.get("data_flow")
     }
     
     with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(ai_input, f, indent=2)
+        json.dump(ai_output_data, f, indent=2)
 
 if __name__ == "__main__":
     import sys

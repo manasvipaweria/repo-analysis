@@ -28,7 +28,7 @@ def write_csv_report(report: Report, filepath: str) -> None:
         writer.writerow([
             "Type", "Finding ID", "Status", "Category", "Priority", "Severity", 
             "Merge Blocking", "File", "Line", "Title", "Description", 
-            "Rule ID", "Code Context", "Detected By",
+            "Rule ID", "Code Context", "Detected By", "GDPR Articles",
             "AI Summary", "Security Impact", "Remediation", "False Positive Prediction"
         ])
         for finding in report.findings:
@@ -46,6 +46,9 @@ def write_csv_report(report: Report, filepath: str) -> None:
             ai_remediation = ai.remediation_suggestion if ai and ai.remediation_suggestion else ""
             ai_fp = str(ai.is_false_positive_prediction) if ai and ai.is_false_positive_prediction is not None else ""
             
+            # Safely handle GDPR references
+            gdpr_refs = ", ".join(finding.gdpr_references) if hasattr(finding, "gdpr_references") and finding.gdpr_references else ""
+            
             writer.writerow([
                 "FINDING",
                 finding.finding_id,
@@ -61,6 +64,7 @@ def write_csv_report(report: Report, filepath: str) -> None:
                 finding.rule_id,
                 context or "",
                 detected_by_str,
+                gdpr_refs,
                 ai_summary,
                 ai_impact,
                 ai_remediation,

@@ -66,6 +66,7 @@ class Finding:
     merge_blocking: bool
     confidence: Optional[str] = None
     ai_fields: Optional[AIFutureFields] = None
+    gdpr_references: Optional[List[str]] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -73,7 +74,8 @@ class Finding:
         finding_id: Optional[str] = None, priority: str = "P3", code_context: Optional[str] = None,
         merge_blocking: bool = False, ai_fields: Optional[AIFutureFields] = None,
         status: str = "OPEN", title: Optional[str] = None, description: Optional[str] = None,
-        location: Optional[FindingLocation] = None, evidence: Optional[FindingEvidence] = None
+        location: Optional[FindingLocation] = None, evidence: Optional[FindingEvidence] = None,
+        gdpr_references: Optional[List[str]] = None
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -100,6 +102,7 @@ class Finding:
         self.merge_blocking = merge_blocking
         self.confidence = confidence
         self.ai_fields = ai_fields
+        self.gdpr_references = gdpr_references or []
 
 @dataclass
 class TestMetrics:
@@ -129,6 +132,7 @@ class Report:
     timestamp: str
     summary: Dict[str, CategorySummary] = field(default_factory=dict)
     findings: List[Finding] = field(default_factory=list)
+    data_flow: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> dict:
         import dataclasses
@@ -182,6 +186,7 @@ class Report:
                 merge_blocking=fd.get("merge_blocking", False),
                 confidence=fd.get("confidence"),
                 ai_fields=ai_fields,
+                gdpr_references=fd.get("gdpr_references", []),
                 file=None, # Legacy args
                 line=None,
                 message=""
@@ -192,5 +197,6 @@ class Report:
             repo=data.get("repo", ""),
             timestamp=data.get("timestamp", ""),
             summary=summary_dict,
-            findings=findings_list
+            findings=findings_list,
+            data_flow=data.get("data_flow")
         )
