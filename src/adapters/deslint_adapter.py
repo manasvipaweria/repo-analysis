@@ -31,19 +31,115 @@ class DeslintAdapter(BaseAdapter):
                 error_message="No React project detected."
             )
 
+        # Build the allowlist of CSS properties that are legitimately inline because
+        # they reference runtime values (width/height for charts, SVGs, canvas sizing)
+        # or because the Apni Mandi design system doesn't have a Tailwind utility for them.
+        #
+        # Design-system findings based on dakiya.apnimandi.us/frontend/src/index.css:
+        #   - Custom tokens: --success, --danger, --warning, --text-primary, --text-secondary,
+        #                    --accent-blue, --border-color, --primary-light, --bg-app
+        #   - Standard shadcn tokens: --primary, --secondary, --muted, --card, --background, etc.
+        #   - Radius scale:  --radius (0.5rem), with sm/md/lg/xl variants
+        #   - Fonts: --font-body (Plus Jakarta Sans), --font-display (Bricolage Grotesque)
+        #
+        # Rules selected rationale:
+        #   no-inline-styles (warn, allowDynamic:true):
+        #       Flag static style={{}} objects only. allowDynamic:true means the rule
+        #       already skips computed values (identifiers, conditionals, template literals
+        #       with expressions) — so charts, progress bars, transforms are not flagged.
+        #       allowlist: CSS properties that have NO direct Tailwind v4 equivalent in
+        #       the Apni Mandi theme (gridTemplateColumns, gap computed values, SVG attrs).
+        #
+        #   no-arbitrary-colors (warn):
+        #       Flags bg-[#hex] in className. Legitimate — Apni Mandi has semantic tokens.
+        #       Does NOT flag var(--token) usage (those are correct).
+        #
+        #   no-arbitrary-spacing (warn):
+        #       Flags p-[23px] style arbitrary values in className. Tailwind v4 4px grid
+        #       should be used. Single instance in TestArbitrary.jsx = test file.
+        #
+        #   no-arbitrary-typography (warn):
+        #       Same as above for text-[15px]. Single instance in TestArbitrary.jsx.
+        #
+        #   responsive-required (warn):
+        #       Flags fixed-width arbitrary Tailwind classes (w-[500px]) that break mobile.
+        #       Single instance in TestArbitrary.jsx. Low noise, high signal.
+        #
+        #   consistent-border-radius (off):
+        #       The Apni Mandi CSS uses 5px, 8px, 10px, 12px, 16px, 20px, 100px all
+        #       legitimately in different contexts (pill vs card vs avatar vs badge).
+        #       This rule would fire ~50+ times with zero actionable signal. OFF.
+        #
+        #   consistent-component-spacing (off):
+        #       Mixed spacing is intentional (0.4rem pill vs 1.2rem card). OFF.
+        #
+        #   missing-states (off):
+        #       Too opinionated without knowing which components need states. OFF.
+        #
+        #   a11y-color-contrast (off):
+        #       Useful but requires theme-aware color resolution. Without knowing oklch
+        #       values of all combinations, produces false positives. OFF for now.
+
         config_content = """import deslint from '@deslint/eslint-plugin';
 
 export default [
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
+    ignores: ['**/__tests__/**', '**/node_modules/**', '**/*.test.*', '**/*.spec.*'],
     plugins: { deslint },
     rules: {
-      'deslint/no-inline-styles': 'warn',
+      // ── Design-system inline style enforcement ───────────────────────────────
+      // allowDynamic:true (default) already skips dynamic expressions:
+      //   style={{ width: `${val}px` }}  ← skipped (TemplateLiteral with expr)
+      //   style={{ color: statusColor }} ← skipped (Identifier)
+      //   style={{ opacity: isActive ? 1 : 0.5 }} ← skipped (ConditionalExpression)
+      //
+      // allowlist: properties with NO Tailwind v4 equivalent in this project.
+      //   'gridTemplateColumns' → complex computed grids
+      //   'strokeDasharray', 'strokeDashoffset' → SVG animation properties
+      //   'willChange' → performance hints
+      //   'WebkitOverflowScrolling' → legacy Safari scrolling
+      'deslint/no-inline-styles': ['warn', {
+        allowDynamic: true,
+        allowlist: [
+          'gridTemplateColumns',
+          'gridColumn',
+          'gridRow',
+          'strokeDasharray',
+          'strokeDashoffset',
+          'willChange',
+          'WebkitOverflowScrolling',
+          'animationDelay',
+          'animationDuration'
+        ]
+      }],
+
+      // ── Arbitrary Tailwind value detection ───────────────────────────────────
+      // These catch bg-[#hex], p-[23px], text-[15px] in className strings.
+      // Apni Mandi has full semantic token coverage so arbitrary values bypass the theme.
       'deslint/no-arbitrary-colors': 'warn',
       'deslint/no-arbitrary-spacing': 'warn',
       'deslint/no-arbitrary-typography': 'warn',
+
+      // ── Responsive design ────────────────────────────────────────────────────
+      // Flags fixed-width Tailwind arbitrary classes (w-[500px]) without
+      // responsive variants. Only fires when there's deterministic evidence.
       'deslint/responsive-required': 'warn',
-      'deslint/missing-states': 'off'
+
+      // ── OFF: require design-system context or too noisy ──────────────────────
+      // consistent-border-radius: Apni Mandi legitimately uses 5/8/10/12/16/20/100px
+      //   in different contexts. Would produce 50+ low-signal findings.
+      'deslint/consistent-border-radius': 'off',
+
+      // consistent-component-spacing: Mixed intentional spacing across card vs pill.
+      'deslint/consistent-component-spacing': 'off',
+
+      // missing-states: Too opinionated without explicit component contracts.
+      'deslint/missing-states': 'off',
+
+      // a11y-color-contrast: Requires resolved oklch values, not string tokens.
+      //   Cannot deterministically verify var(--primary) contrast without rendering.
+      'deslint/a11y-color-contrast': 'off'
     },
     languageOptions: {
       parserOptions: {
