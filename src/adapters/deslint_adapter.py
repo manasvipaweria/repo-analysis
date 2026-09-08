@@ -63,14 +63,15 @@ export default [
                 f.write(config_content)
                 
             # Install ESLint and Deslint temporarily if not present
-            install_cmd = ["npm", "install", "--no-save", "eslint@9", "@deslint/eslint-plugin"]
-            subprocess.run(install_cmd, cwd=repo_path, capture_output=True)
+            install_cmd = "npm install --no-save eslint@9 @deslint/eslint-plugin"
+            subprocess.run(install_cmd, cwd=repo_path, capture_output=True, shell=True)
 
-            cmd = ["npx", "eslint", "-c", ".deslint.config.mjs", ".", "-f", "json"]
+            cmd = "npx eslint -c .deslint.config.mjs . -f json"
             result = subprocess.run(
                 cmd,
                 cwd=repo_path,
                 capture_output=True,
+                shell=True,
                 text=True, encoding="utf-8", errors="replace"
             )
             

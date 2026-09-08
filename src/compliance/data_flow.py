@@ -14,8 +14,8 @@ def run_js_ast_extractor(repo_path: str) -> List[Dict[str, Any]]:
             if file.endswith(('.js', '.jsx', '.ts', '.tsx')):
                 file_path = os.path.join(root, file)
                 try:
-                    cmd = ["node", extractor_path, file_path]
-                    proc = subprocess.run(cmd, capture_output=True, text=True)
+                    cmd = f'node "{extractor_path}" "{file_path}"'
+                    proc = subprocess.run(cmd, capture_output=True, text=True, shell=True)
                     if proc.returncode == 0 and proc.stdout:
                         try:
                             data = json.loads(proc.stdout)
@@ -51,8 +51,8 @@ def extract_data_flow(repo_path: str) -> Dict[str, Any]:
             
     # Run dependency-cruiser to supplement
     try:
-        cmd = ["npx", "dependency-cruiser", "--include-only", "^src", "--output-type", "json", "src"]
-        proc = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True)
+        cmd = "npx dependency-cruiser --include-only ^src --output-type json src"
+        proc = subprocess.run(cmd, cwd=repo_path, capture_output=True, text=True, shell=True)
         if proc.returncode == 0 and proc.stdout:
             dc_data = json.loads(proc.stdout)
             compiled["dependencies"] = dc_data.get("modules", [])
