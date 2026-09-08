@@ -203,6 +203,7 @@ export default [
             findings = []
             for file_result in output_data:
                 file_path = file_result.get("filePath", "")
+                abs_file_path = file_path  # keep full path for classifier
                 if file_path.startswith(repo_path):
                     file_path = os.path.relpath(file_path, repo_path).replace("\\", "/")
                     
@@ -210,15 +211,37 @@ export default [
                     rule_id = msg.get("ruleId") or ""
                     if not rule_id.startswith("deslint/"):
                         continue
-                        
+
+                    line_no = msg.get("line", 0)
+
+                    # ── Inline-style classification ───────────────────────────
+                    # For no-inline-styles findings only, attempt to classify the
+                    # finding into one of four categories using the verified
+                    # Apni Mandi design-system mapping. Does not modify Dakiya source.
+                    classification = None
+                    suggested_migration = None
+                    if rule_id == "deslint/no-inline-styles":
+                        try:
+                            from src.adapters.deslint_classifier import classify_inline_style
+                            result_cls = classify_inline_style(abs_file_path, line_no)
+                            classification = result_cls.category
+                            suggested_migration = result_cls.suggested_migration
+                        except Exception:
+                            classification = "UNCATEGORIZED"
+
+                    from src.core.models import FindingEvidence
                     findings.append(Finding(
                         category=Category.QUALITY.value,
                         severity="medium",
                         file=file_path,
-                        line=msg.get("line", 0),
+                        line=line_no,
                         message=msg.get("message", "Deslint finding"),
                         rule_id=rule_id,
-                        detected_by=[self.tool_name]
+                        detected_by=[self.tool_name],
+                        evidence=FindingEvidence(
+                            classification=classification,
+                            suggested_migration=suggested_migration,
+                        )
                     ))
                     
             return ToolResult(

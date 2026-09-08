@@ -41,6 +41,16 @@ class FindingLocation:
 @dataclass
 class FindingEvidence:
     code_context: Optional[str] = None
+    # Structured classification for inline-style findings. Values:
+    #   EXACT_MIGRATION       - has a verified Tailwind/design-system equivalent
+    #   TOKEN_CONTEXT_REQUIRED - uses a CSS custom property with no verified Tailwind utility
+    #   DYNAMIC_ALLOWED       - runtime/computed value, correct to be inline
+    #   TEST_FIXTURE          - intentional test file, not a production issue
+    #   UNCATEGORIZED         - default when classification is not applicable or undetermined
+    classification: Optional[str] = None
+    # For EXACT_MIGRATION: the specific Tailwind class that replaces the inline style.
+    # Only set when the equivalence is verified against the actual design system.
+    suggested_migration: Optional[str] = None
 
 @dataclass
 class AIFutureFields:

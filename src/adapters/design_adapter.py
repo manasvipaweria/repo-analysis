@@ -63,17 +63,21 @@ class ApniMandiDesignAdapter(BaseAdapter):
 
     def _run_ai_semantic(self, repo_path: str) -> List[Finding]:
         # Semantic checks via AI if requested
-        # For this to run, we must have GEMINI_API_KEY and ENABLE_DESIGN_AI="true"
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            print(f"[{self.tool_name}] GEMINI_API_KEY not set — skipping AI semantic check")
+            print(f"[{self.tool_name}] GEMINI_API_KEY not set - skipping AI semantic check")
             return []
             
         try:
             import requests
-            # Find main page/app files — case-insensitive, covers .js/.jsx/.tsx
+            import subprocess
+            
+            extractor_script = os.path.join(os.path.dirname(__file__), "extract_ui_context.js")
+            
             pages_context = ""
             matched_files = []
+            
+            # 1. Discover files
             for root, _, files in os.walk(repo_path):
                 skip_dirs = ["node_modules", ".next", "dist", "build", "coverage", "__tests__", ".git"]
                 if any(d in root for d in skip_dirs):
@@ -82,47 +86,77 @@ class ApniMandiDesignAdapter(BaseAdapter):
                     if file.lower().endswith(self.DESIGN_FILE_SUFFIXES):
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, repo_path)
-                        matched_files.append(rel_path)
-                        with open(full_path, "r", encoding="utf-8", errors="ignore") as fh:
-                            raw = fh.read()
-                            if len(raw) > 20000:
-                                print(f"[{self.tool_name}] File {rel_path} truncated to 20000 chars (actual: {len(raw)} chars)")
-                            content = raw[:20000]
-                            pages_context += f"\n--- {rel_path} ---\n{content}\n"
-
-            # Explicit log so discovery failures are visible in CI logs
-            print(f"[{self.tool_name}] Design files discovered: {matched_files if matched_files else 'NONE'}")
-
-            if not pages_context.strip():
-                print(f"[{self.tool_name}] No matching design files found under {repo_path} — skipping AI semantic check")
+                        matched_files.append(full_path)
+            
+            print(f"[{self.tool_name}] Design files discovered: {len(matched_files)}")
+            
+            if not matched_files:
                 return []
                 
+            # 2. Extract UI Context
+            for full_path in matched_files:
+                rel_path = os.path.relpath(full_path, repo_path)
+                try:
+                    result = subprocess.run(["node", extractor_script, full_path], capture_output=True, text=True, check=True)
+                    ui_map = result.stdout.strip()
+                    if ui_map:
+                        pages_context += f"\n--- FILE: {rel_path} ---\n{ui_map}\n"
+                except subprocess.CalledProcessError as e:
+                    print(f"[{self.tool_name}] Failed to extract UI context for {rel_path}: {e.stderr}")
+                    continue
+                    
+            if not pages_context.strip():
+                print(f"[{self.tool_name}] No UI context extracted - skipping AI semantic check")
+                return []
+
+            system_instruction = (
+                "You are an expert UX and UI Design System reviewer evaluating React applications.\n"
+                "Your goal is to find high-signal, semantic design and UX problems based on the application's UI structure and behavior.\n"
+                "Do NOT report simple deterministic issues (like raw formatting, basic inline styles, or exact Tailwind syntax).\n"
+                "Focus on semantic reasoning: visual hierarchy, component consistency across the app, UX clarity, semantic accessibility concerns, and responsive UX.\n\n"
+                "Apni Mandi Design System Context:\n"
+                "- Colors (Shadcn standard utilities): primary, secondary, muted, accent, destructive, background, foreground, border, card.\n"
+                "- Custom Colors (CSS variables): --success, --danger, --warning, --text-primary, --text-secondary, --border-color, --primary-light.\n"
+                "- Typography: font-body (Plus Jakarta Sans), font-display (Bricolage Grotesque), font-mono (Geist Mono).\n"
+                "- Spacing: Standard Tailwind 4px grid.\n"
+                "- Border radius: standard Tailwind rounded classes and --radius token.\n"
+                "- Use semantic components (e.g. <Button>, <Card>, <Input>, <Badge>) where possible rather than raw elements.\n\n"
+                "Guidelines:\n"
+                "1. If multiple primary actions exist with identical visual emphasis in the same view, flag it as a visual hierarchy issue.\n"
+                "2. If similar UI areas use completely different interaction patterns or layouts without reason, flag component consistency.\n"
+                "3. If a form is missing clear labels or grouping, flag UX clarity.\n"
+                "4. If interactive icons lack accessible names or text, flag accessibility.\n"
+                "5. If a stateful component has 'loading' or 'error' state variables but no visible UI branches to handle them, flag state handling.\n"
+                "6. DO NOT invent findings if the UI Context Map looks reasonable.\n"
+                "7. ONLY report findings that require semantic/human-like reasoning."
+            )
+            
             prompt = (
-                "You are a strict UI Design System enforcer reviewing legacy React code.\n"
-                "Your job is to aggressively FIND design system violations in the provided code.\n"
-                "FLAG THE FOLLOWING VIOLATIONS:\n"
-                "1. ANY use of inline styles (e.g. style={{ background: '#...' }}). All styling must use CSS classes or Tailwind.\n"
-                "2. ANY use of raw HTML <button> tags instead of a unified <Button> component.\n"
-                "3. Multiple primary action buttons in the same view.\n"
-                "4. Bad copywriting (e.g. using generic words like 'Submit' instead of descriptive actions).\n\n"
-                "Return a structured JSON object exactly like this:\n"
+                "Review the following UI Context Maps extracted from the React application.\n"
+                "The maps show the component signatures, state variables, event handlers, and the JSX UI hierarchy (filtered to show meaningful elements, conditions, and classes).\n\n"
+                f"{pages_context}\n\n"
+                "Return a structured JSON object with your findings:\n"
                 "{\n"
                 '  "findings": [\n'
                 "    {\n"
-                '      "file": "path",\n'
+                '      "file": "path/to/file",\n'
                 '      "line": 10,\n'
-                '      "message": "Found raw HTML <button> tag. Must use unified <Button> component.",\n'
-                '      "rule_id": "ai-semantic-legacy-element"\n'
+                '      "message": "Clear description of the semantic design issue and why it harms UX.",\n'
+                '      "rule_id": "gemini/design-hierarchy",\n'
+                '      "severity": "medium",\n'
+                '      "category": "Quality",\n'
+                '      "confidence": "high",\n'
+                '      "recommendation": "How to fix it"\n'
                 "    }\n"
                 "  ]\n"
                 "}\n\n"
-                f"Context:\n{pages_context}"
+                "IMPORTANT: If there are no meaningful semantic issues, return an empty findings array []. Do NOT invent trivial issues."
             )
             
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key={api_key}"
             payload = {
                 "system_instruction": {
-                    "parts": [{"text": "You enforce strict UI design semantic rules."}]
+                    "parts": [{"text": system_instruction}]
                 },
                 "contents": [
                     {"parts": [{"text": prompt}]}
@@ -140,25 +174,20 @@ class ApniMandiDesignAdapter(BaseAdapter):
                 
             data = response.json()
             
-            # Token Tracking & Logging
             usage = data.get("usageMetadata", {})
             input_tokens = usage.get("promptTokenCount", 0)
             output_tokens = usage.get("candidatesTokenCount", 0)
             print(f"[{self.tool_name}] AI Token Usage - Input: {input_tokens} | Output: {output_tokens} | Total: {input_tokens + output_tokens}")
             
-            # Safe response parsing — guard against safety-filtered/malformed candidates
             candidates = data.get("candidates", [])
             if not candidates:
-                print(f"[{self.tool_name}] Gemini returned no candidates (possible safety filter). Raw: {data}")
                 return []
             candidate = candidates[0]
             finish_reason = candidate.get("finishReason", "UNKNOWN")
             if finish_reason not in ("STOP", "MAX_TOKENS"):
-                print(f"[{self.tool_name}] Unexpected finishReason: {finish_reason}. Skipping.")
                 return []
             parts = candidate.get("content", {}).get("parts", [])
             if not parts:
-                print(f"[{self.tool_name}] Gemini candidate had empty parts. Raw: {candidate}")
                 return []
             text_response = parts[0].get("text", "{}")
             try:
@@ -170,15 +199,15 @@ class ApniMandiDesignAdapter(BaseAdapter):
             findings = []
             for f in result_json.get("findings", []):
                 findings.append(Finding(
-                    category=Category.QUALITY.value,
-                    severity="info",
+                    category=f.get("category", Category.QUALITY.value),
+                    severity=f.get("severity", "medium"),
                     file=f.get("file", "unknown"),
                     line=f.get("line", 0),
                     message=f.get("message", ""),
-                    rule_id=f.get("rule_id", "ai-semantic-design"),
+                    rule_id=f.get("rule_id", "gemini/semantic-design"),
                     detected_by=[self.tool_name],
-                    code_context="",
-                    merge_blocking=False # AI checks are never merge blocking
+                    code_context=f.get("recommendation", ""),
+                    merge_blocking=False
                 ))
             return findings
             
