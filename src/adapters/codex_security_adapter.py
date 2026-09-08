@@ -25,7 +25,7 @@ class CodexSecurityAdapter(BaseAdapter):
             "--format", "json", 
             "--headless", 
             "--effort", "low", 
-            "--max-cost", "2.00"
+            "--max-cost", "3.00"
         ]
         
         try:
