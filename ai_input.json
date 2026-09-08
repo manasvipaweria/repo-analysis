@@ -1,5 +1,142 @@
 {
-  "repository": "tests/fixtures/js_project",
-  "analysis_timestamp": "2026-08-26T09:59:52.239272+00:00",
-  "findings": []
+  "repository": "../test-fixture",
+  "analysis_timestamp": "2026-09-08T14:36:27.539441+00:00",
+  "findings": [
+    {
+      "finding_id": "0a01fe5c-1b8c-4445-81a9-c8ab9acf0931",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "GDPR: excessive-pii-fields",
+      "file": "src/App.jsx",
+      "rule_id": "excessive-pii-fields",
+      "detected_by": [
+        "data-flow-extractor"
+      ],
+      "merge_blocking": true,
+      "line": 9,
+      "gdpr_references": [
+        "Art. 5(1)(c)"
+      ],
+      "message": "Detected GDPR-relevant technical evidence: email",
+      "code_context": "export default function App() {\n    const userModel = {\n        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n"
+    },
+    {
+      "finding_id": "a7b2d5cf-702f-40d3-ab3b-dab63cd776a6",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "GDPR: excessive-pii-fields",
+      "file": "src/App.jsx",
+      "rule_id": "excessive-pii-fields",
+      "detected_by": [
+        "data-flow-extractor"
+      ],
+      "merge_blocking": true,
+      "line": 10,
+      "gdpr_references": [
+        "Art. 5(1)(c)"
+      ],
+      "message": "Detected GDPR-relevant technical evidence: password",
+      "code_context": "    const userModel = {\n        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n    };\n"
+    },
+    {
+      "finding_id": "237ac4e5-aadf-4311-bb26-ddf866276e8d",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "GDPR: excessive-pii-fields",
+      "file": "src/App.jsx",
+      "rule_id": "excessive-pii-fields",
+      "detected_by": [
+        "data-flow-extractor"
+      ],
+      "merge_blocking": true,
+      "line": 11,
+      "gdpr_references": [
+        "Art. 5(1)(c)"
+      ],
+      "message": "Detected GDPR-relevant technical evidence: credit_card",
+      "code_context": "        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n    };\n\n"
+    },
+    {
+      "finding_id": "6a73ece1-a637-4538-b51e-af9819366ce3",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "GDPR: consent-checkbox-default",
+      "file": "src/App.jsx",
+      "rule_id": "consent-checkbox-default",
+      "detected_by": [
+        "data-flow-extractor"
+      ],
+      "merge_blocking": true,
+      "line": 22,
+      "gdpr_references": [
+        "Art. 7"
+      ],
+      "message": "Detected GDPR-relevant technical evidence: defaultChecked_checkbox",
+      "code_context": "        <div>\n            <h1>GDPR Test</h1>\n            <input type=\"checkbox\" defaultChecked={true} />\n        </div>\n    );\n"
+    },
+    {
+      "finding_id": "c4fc3c17-5cec-42c4-8baa-58f6ef8ce3b3",
+      "status": "OPEN",
+      "category": "architecture",
+      "severity": "info",
+      "priority": "P3",
+      "title": "GDPR: missing-export-endpoint",
+      "file": "general",
+      "rule_id": "missing-export-endpoint",
+      "detected_by": [
+        "data-flow-extractor"
+      ],
+      "merge_blocking": false,
+      "gdpr_references": [
+        "Art. 15"
+      ],
+      "message": "Technical evidence not detected: No explicit data portability/export endpoint found."
+    }
+  ],
+  "data_flow": {
+    "outbound_domains": [
+      "https://api.thirdparty.com/data",
+      "https://analytics.thirdparty.com/track"
+    ],
+    "api_endpoints": [
+      {
+        "method": "POST",
+        "route": "/api/users",
+        "line": 28,
+        "file": "src/App.jsx"
+      }
+    ],
+    "pii_fields": [
+      {
+        "field": "email",
+        "line": 9,
+        "file": "src/App.jsx"
+      },
+      {
+        "field": "password",
+        "line": 10,
+        "file": "src/App.jsx"
+      },
+      {
+        "field": "credit_card",
+        "line": 11,
+        "file": "src/App.jsx"
+      },
+      {
+        "field": "defaultChecked_checkbox",
+        "line": 22,
+        "file": "src/App.jsx"
+      }
+    ],
+    "db_destinations": [],
+    "dependencies": []
+  }
 }

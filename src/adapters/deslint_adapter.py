@@ -43,8 +43,7 @@ export default [
       'deslint/no-arbitrary-spacing': 'warn',
       'deslint/no-arbitrary-typography': 'warn',
       'deslint/responsive-required': 'warn',
-      'deslint/missing-states': 'off',
-      'deslint/no-default-checked': 'warn'
+      'deslint/missing-states': 'off'
     },
     languageOptions: {
       parserOptions: {
@@ -56,35 +55,53 @@ export default [
   }
 ];
 """
-        config_path = os.path.join(repo_path, ".deslint.config.mjs")
+        react_dir = repo_path
+        for root_dir, dirs, files in os.walk(repo_path):
+            if 'node_modules' in dirs:
+                dirs.remove('node_modules')
+            if 'package.json' in files:
+                try:
+                    with open(os.path.join(root_dir, 'package.json'), 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        deps = {**data.get('dependencies', {}), **data.get('devDependencies', {})}
+                        if 'react' in deps or 'react-dom' in deps:
+                            react_dir = root_dir
+                            break
+                except Exception:
+                    pass
+
+        config_path = os.path.join(react_dir, ".deslint.config.mjs")
         
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(config_content)
                 
-            # Install ESLint and Deslint temporarily if not present
-            install_cmd = "npm install --no-save eslint@9 @deslint/eslint-plugin"
-            subprocess.run(install_cmd, cwd=repo_path, capture_output=True, shell=True)
-
             cmd = "npx eslint -c .deslint.config.mjs . -f json"
             result = subprocess.run(
                 cmd,
-                cwd=repo_path,
+                cwd=react_dir,
                 capture_output=True,
                 shell=True,
                 text=True, encoding="utf-8", errors="replace"
             )
             
-            try:
-                output_data = json.loads(result.stdout)
-            except json.JSONDecodeError:
-                if not result.stdout.strip():
-                    output_data = []
-                else:
+            if not result.stdout.strip():
+                if result.returncode != 0:
                     return ToolResult(
                         tool=self.tool_name,
                         status=ToolStatus.ERROR,
-                        error_message=f"Failed to parse ESLint output: {result.stdout[:200]}"
+                        error_message=f"ESLint failed with exit code {result.returncode}: {result.stderr.strip()[:500]}"
+                    )
+                output_data = []
+            else:
+                try:
+                    output_data = json.loads(result.stdout)
+                except json.JSONDecodeError:
+                    error_src = result.stderr if result.stderr.strip() else result.stdout
+                    return ToolResult(
+                        tool=self.tool_name,
+                        status=ToolStatus.ERROR,
+                        error_message=f"Failed to parse ESLint JSON (exit code {result.returncode}): {error_src.strip()[:500]}"
                     )
             
             findings = []

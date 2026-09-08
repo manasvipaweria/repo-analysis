@@ -5,7 +5,7 @@ from src.compliance.data_flow import extract_data_flow
 
 def test_gdpr_mapping():
     # Test deterministic check matching
-    articles = get_gdpr_articles_for_rule("excessive-pii-fields")
+    articles = get_gdpr_articles_for_rule("personal-data-field-detected")
     assert "Art. 5(1)(c)" in articles
     
     # Test existing rule wildcard mapping

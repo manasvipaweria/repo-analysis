@@ -15,7 +15,7 @@ class Orchestrator:
         tool_results: List[ToolResult] = []
         all_findings: List[Finding] = []
         
-        category_to_tools: Dict[str, List[ToolResult]] = {}
+        category_to_tools: Dict[str, List[ToolResult]] = {cat.value: [] for cat in Category}
         
         for adapter in self.adapters:
             try:
@@ -49,42 +49,44 @@ class Orchestrator:
             
             # Map deterministic AST findings to normalized Finding objects
             for pii in flow_data.get("pii_fields", []):
-                rule_id = "excessive-pii-fields"
+                rule_id = "personal-data-field-detected"
+                msg = f"Personal-data field detected: {pii['field']}"
                 if pii["field"] == "defaultChecked_checkbox":
                     rule_id = "consent-checkbox-default"
+                    msg = f"Detected GDPR-relevant technical evidence: {pii['field']}"
                     
                 finding = Finding(
-                    finding_id=str(uuid.uuid4()),
-                    status="OPEN",
                     category=Category.SECURITY.value,
                     severity="medium",
+                    file=pii["file"],
+                    line=pii["line"],
+                    message=msg,
+                    rule_id=rule_id,
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
                     priority="P3",
                     title=f"GDPR: {rule_id}",
-                    description=f"Detected GDPR-relevant technical evidence: {pii['field']}",
-                    location=FindingLocation(file=pii["file"], line=pii["line"]),
                     evidence=FindingEvidence(code_context="AST extracted node"),
                     detected_by=["data-flow-extractor"],
-                    rule_id=rule_id,
                     merge_blocking=False
                 )
                 deduped_findings.append(finding)
                 
-            # If no export/delete endpoints found, we could flag 'missing-export-endpoint', etc.
-            # (Simplified logic to demonstrate the layer without breaking tests)
             endpoints = [e["route"] for e in flow_data.get("api_endpoints", [])]
             if not any("export" in e for e in endpoints):
                 deduped_findings.append(Finding(
-                    finding_id=str(uuid.uuid4()),
-                    status="OPEN",
                     category=Category.ARCHITECTURE.value,
                     severity="info",
+                    file="general",
+                    line=0,
+                    message="Technical evidence not detected: No explicit data portability/export endpoint found.",
+                    rule_id="missing-export-endpoint",
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
                     priority="P3",
                     title="GDPR: missing-export-endpoint",
-                    description="Technical evidence not detected: No explicit data portability/export endpoint found.",
-                    location=FindingLocation(file="general", line=0),
                     evidence=FindingEvidence(),
                     detected_by=["data-flow-extractor"],
-                    rule_id="missing-export-endpoint",
                     merge_blocking=False
                 ))
         except Exception as e:

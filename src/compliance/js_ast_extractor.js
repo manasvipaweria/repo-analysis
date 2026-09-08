@@ -24,7 +24,18 @@ try {
         db_destinations: []
     };
 
-    const piiKeywords = ['email', 'password', 'ssn', 'phone', 'address', 'dob', 'credit_card', 'card_number', 'blood_type'];
+    const piiKeywords = ['email', 'password', 'ssn', 'phone', 'address', 'dob', 'credit card', 'card number', 'blood type', 'social security number'];
+
+    function isPiiField(keyName) {
+        if (!keyName) return false;
+        // Normalize camelCase and special chars to spaces
+        const spaced = keyName.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^a-zA-Z0-9]/g, ' ').toLowerCase();
+        
+        return piiKeywords.some(k => {
+            const regex = new RegExp(`\\b${k}\\b`, 'i');
+            return regex.test(spaced);
+        });
+    }
 
     traverse(ast, {
         CallExpression(path) {
@@ -75,7 +86,7 @@ try {
                 keyName = path.node.key.value;
             }
             
-            if (keyName && piiKeywords.some(k => keyName.toLowerCase().includes(k))) {
+            if (isPiiField(keyName)) {
                 extraction.pii_fields.push({
                     field: keyName,
                     line: path.node.loc.start.line
