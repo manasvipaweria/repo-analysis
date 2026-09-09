@@ -29,6 +29,7 @@ def write_csv_report(report: Report, filepath: str) -> None:
             "Type", "Finding ID", "Status", "Category", "Priority", "Severity", 
             "Merge Blocking", "File", "Line", "Title", "Description", 
             "Rule ID", "Code Context", "Detected By", "GDPR Articles",
+            "Requirement", "Detected Evidence", "Recommended Action", "Human Review Required",
             "AI Summary", "Security Impact", "Remediation", "False Positive Prediction"
         ])
         for finding in report.findings:
@@ -65,6 +66,10 @@ def write_csv_report(report: Report, filepath: str) -> None:
                 context or "",
                 detected_by_str,
                 gdpr_refs,
+                finding.requirement or "",
+                finding.detected_evidence or "",
+                finding.recommended_action or "",
+                finding.human_review_required or "",
                 ai_summary,
                 ai_impact,
                 ai_remediation,

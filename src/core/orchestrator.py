@@ -351,3 +351,17 @@ class Orchestrator:
                     articles.extend(get_gdpr_articles_for_rule(f"{tool}/*"))
             
             f.gdpr_references = list(set(articles))
+
+            # Compliance Manager Questions Enrichment
+            from src.compliance.requirement_text import get_finding_spec
+            spec = get_finding_spec(f.rule_id)
+            if not f.requirement and spec.get("requirement"):
+                f.requirement = spec["requirement"]
+            if not f.detected_evidence:
+                code_ctx = f.evidence.code_context if f.evidence else ""
+                loc_str = f"{f.location.file}:{f.location.line}" if f.location and f.location.file else "unknown location"
+                f.detected_evidence = f"WHAT WAS DETECTED: {f.description} (Location: {loc_str})" + (f"\nCode Context:\n{code_ctx}" if code_ctx else "")
+            if not f.recommended_action and spec.get("recommended_action"):
+                f.recommended_action = spec["recommended_action"]
+            if not f.human_review_required and spec.get("human_review_required"):
+                f.human_review_required = spec["human_review_required"]

@@ -107,7 +107,7 @@ def test_csv_summary_generation(tmp_path):
     assert "SUMMARY,qual,ISSUES_FOUND,1" in content
     
     # Check headers
-    assert "Type,Finding ID,Status,Category,Priority,Severity,Merge Blocking,File,Line,Title,Description,Rule ID,Code Context,Detected By,GDPR Articles,AI Summary,Security Impact,Remediation,False Positive Prediction" in content
+    assert "Type,Finding ID,Status,Category,Priority,Severity,Merge Blocking,File,Line,Title,Description,Rule ID,Code Context,Detected By,GDPR Articles,Requirement,Detected Evidence,Recommended Action,Human Review Required,AI Summary,Security Impact,Remediation,False Positive Prediction" in content
     
     # Check finding fields and trailing blank AI columns
     assert "FINDING," in content

@@ -89,6 +89,11 @@ class Finding:
     ai_fields: Optional[AIFutureFields] = None
     gdpr_references: Optional[List[str]] = None
     compliance_finding_type: Optional['ComplianceFindingType'] = None
+    # Compliance report fields — human-readable answers for every GDPR finding
+    requirement: Optional[str] = None          # What regulation applies and why it matters
+    detected_evidence: Optional[str] = None    # What was found in the code (populated per-finding)
+    recommended_action: Optional[str] = None   # What needs to be verified or changed
+    human_review_required: Optional[str] = None  # Whether legal/human review is needed
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -98,7 +103,11 @@ class Finding:
         status: str = "OPEN", title: Optional[str] = None, description: Optional[str] = None,
         location: Optional[FindingLocation] = None, evidence: Optional[FindingEvidence] = None,
         gdpr_references: Optional[List[str]] = None,
-        compliance_finding_type: Optional['ComplianceFindingType'] = None
+        compliance_finding_type: Optional['ComplianceFindingType'] = None,
+        requirement: Optional[str] = None,
+        detected_evidence: Optional[str] = None,
+        recommended_action: Optional[str] = None,
+        human_review_required: Optional[str] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -127,6 +136,10 @@ class Finding:
         self.ai_fields = ai_fields
         self.gdpr_references = gdpr_references or []
         self.compliance_finding_type = compliance_finding_type
+        self.requirement = requirement
+        self.detected_evidence = detected_evidence
+        self.recommended_action = recommended_action
+        self.human_review_required = human_review_required
 
 @dataclass
 class TestMetrics:
@@ -212,7 +225,11 @@ class Report:
                 ai_fields=ai_fields,
                 gdpr_references=fd.get("gdpr_references", []),
                 compliance_finding_type=ComplianceFindingType(fd["compliance_finding_type"]) if fd.get("compliance_finding_type") else None,
-                file=None, # Legacy args
+                requirement=fd.get("requirement"),
+                detected_evidence=fd.get("detected_evidence"),
+                recommended_action=fd.get("recommended_action"),
+                human_review_required=fd.get("human_review_required"),
+                file=None,  # Legacy args
                 line=None,
                 message=""
             )
