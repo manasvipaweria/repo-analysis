@@ -175,7 +175,7 @@ export default [
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(config_content)
                 
-            subprocess.run("npm install --no-fund --no-audit", cwd=react_dir, shell=True, capture_output=True)
+            subprocess.run("npm install --include=dev --no-fund --no-audit", cwd=react_dir, shell=True, capture_output=True)
             
             cmd = "npx eslint -c .deslint.config.mjs . -f json"
             result = subprocess.run(

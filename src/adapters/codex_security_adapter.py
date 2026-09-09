@@ -28,6 +28,14 @@ class CodexSecurityAdapter(BaseAdapter):
             "--max-cost", "5.00"
         ]
         
+        # Scope scan paths to source directories to exclude node_modules from cost estimation
+        sub_paths = []
+        for p in ["backend", "frontend", "src"]:
+            if os.path.isdir(os.path.join(repo_path, p)):
+                sub_paths.extend(["--path", p])
+        if sub_paths:
+            cmd.extend(sub_paths)
+        
         try:
             result = subprocess.run(
                 cmd,
