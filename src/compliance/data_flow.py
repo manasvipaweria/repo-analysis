@@ -36,7 +36,10 @@ def extract_data_flow(repo_path: str) -> Dict[str, Any]:
         "api_endpoints": [],
         "pii_fields": [],
         "db_destinations": [],
-        "dependencies": []
+        "dependencies": [],
+        "unused_pii_fields": [],
+        "third_party_transfers": [],
+        "unprotected_storage": []
     }
     
     for res in ast_results:
@@ -48,6 +51,15 @@ def extract_data_flow(repo_path: str) -> Dict[str, Any]:
         for pii in res.get("pii_fields", []):
             pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
             compiled["pii_fields"].append(pii)
+        for pii in res.get("unused_pii_fields", []):
+            pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
+            compiled["unused_pii_fields"].append(pii)
+        for pii in res.get("third_party_transfers", []):
+            pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
+            compiled["third_party_transfers"].append(pii)
+        for pii in res.get("unprotected_storage", []):
+            pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
+            compiled["unprotected_storage"].append(pii)
             
     # Run dependency-cruiser to supplement
     try:

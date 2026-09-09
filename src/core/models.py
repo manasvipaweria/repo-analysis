@@ -18,6 +18,13 @@ class Category(str, Enum):
     TESTING = "testing"
     TYPING = "typing"
 
+class ComplianceFindingType(str, Enum):
+    INVENTORY = "inventory"                 # personal data detected, no risk indicator attached
+    THIRD_PARTY_RISK = "third_party_risk"   # personal data transmitted to an external service
+    SECURITY_GAP = "security_gap"           # personal data inadequately protected (Art. 32)
+    MINIMISATION_FLAG = "minimisation_flag" # field collected but no downstream use detected
+    HUMAN_REVIEW = "human_review"           # cannot be determined from source code
+
 class ToolStatus(str, Enum):
     COMPLETED = "COMPLETED"
     ERROR = "ERROR"
@@ -77,6 +84,7 @@ class Finding:
     confidence: Optional[str] = None
     ai_fields: Optional[AIFutureFields] = None
     gdpr_references: Optional[List[str]] = None
+    compliance_finding_type: Optional['ComplianceFindingType'] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -85,7 +93,8 @@ class Finding:
         merge_blocking: bool = False, ai_fields: Optional[AIFutureFields] = None,
         status: str = "OPEN", title: Optional[str] = None, description: Optional[str] = None,
         location: Optional[FindingLocation] = None, evidence: Optional[FindingEvidence] = None,
-        gdpr_references: Optional[List[str]] = None
+        gdpr_references: Optional[List[str]] = None,
+        compliance_finding_type: Optional['ComplianceFindingType'] = None
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -113,6 +122,7 @@ class Finding:
         self.confidence = confidence
         self.ai_fields = ai_fields
         self.gdpr_references = gdpr_references or []
+        self.compliance_finding_type = compliance_finding_type
 
 @dataclass
 class TestMetrics:
@@ -197,6 +207,7 @@ class Report:
                 confidence=fd.get("confidence"),
                 ai_fields=ai_fields,
                 gdpr_references=fd.get("gdpr_references", []),
+                compliance_finding_type=ComplianceFindingType(fd["compliance_finding_type"]) if fd.get("compliance_finding_type") else None,
                 file=None, # Legacy args
                 line=None,
                 message=""

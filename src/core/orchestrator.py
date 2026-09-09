@@ -42,22 +42,23 @@ class Orchestrator:
         # Phase 1, 2, 3: Shared Data Flow Extraction and Deterministic GDPR Checks
         try:
             from src.compliance.data_flow import extract_data_flow
-            from src.core.models import FindingLocation, FindingEvidence
+            from src.core.models import FindingLocation, FindingEvidence, ComplianceFindingType
+            from src.compliance.requirement_text import REQUIREMENTS
             import uuid
             
             flow_data = extract_data_flow(repo_path)
             
-            # Map deterministic AST findings to normalized Finding objects
+            # 1. Base Inventory
             for pii in flow_data.get("pii_fields", []):
                 rule_id = "personal-data-field-detected"
-                msg = f"Personal-data field detected: {pii['field']}"
+                msg = f"Personal data detected: {pii['field']}"
                 if pii["field"] == "defaultChecked_checkbox":
                     rule_id = "consent-checkbox-default"
-                    msg = f"Detected GDPR-relevant technical evidence: {pii['field']}"
+                    msg = f"Consent UI component: {pii['field']}"
                     
                 finding = Finding(
                     category=Category.SECURITY.value,
-                    severity="medium",
+                    severity="info",
                     file=pii["file"],
                     line=pii["line"],
                     message=msg,
@@ -68,31 +69,109 @@ class Orchestrator:
                     title=f"GDPR: {rule_id}",
                     evidence=FindingEvidence(code_context="AST extracted node"),
                     detected_by=["data-flow-extractor"],
-                    merge_blocking=False
+                    merge_blocking=False,
+                    compliance_finding_type=ComplianceFindingType.INVENTORY
                 )
                 deduped_findings.append(finding)
                 
-            endpoints = [e["route"] for e in flow_data.get("api_endpoints", [])]
-            if not any("export" in e for e in endpoints):
-                deduped_findings.append(Finding(
-                    category=Category.ARCHITECTURE.value,
-                    severity="info",
-                    file="general",
-                    line=0,
-                    message="Technical evidence not detected: No explicit data portability/export endpoint found.",
-                    rule_id="missing-export-endpoint",
+            # 2. Unused PII -> MINIMISATION_FLAG
+            for pii in flow_data.get("unused_pii_fields", []):
+                rule_id = "unused-personal-data"
+                finding = Finding(
+                    category=Category.SECURITY.value,
+                    severity="medium",
+                    file=pii["file"],
+                    line=pii["line"],
+                    message=f"Personal data collected but never read/used: {pii['field']}",
+                    rule_id=rule_id,
                     finding_id=str(uuid.uuid4()),
                     status="OPEN",
-                    priority="P3",
-                    title="GDPR: missing-export-endpoint",
-                    evidence=FindingEvidence(),
+                    priority="P2",
+                    title=f"GDPR: {rule_id}",
+                    evidence=FindingEvidence(code_context="AST extracted node"),
                     detected_by=["data-flow-extractor"],
-                    merge_blocking=False
-                ))
+                    merge_blocking=False,
+                    compliance_finding_type=ComplianceFindingType.MINIMISATION_FLAG,
+                    gdpr_references=["Art. 5(1)(c)"],
+                    code_context=REQUIREMENTS["Art. 5(1)(c)"]
+                )
+                deduped_findings.append(finding)
+                
+            # 3. Third-party transfers
+            for tx in flow_data.get("third_party_transfers", []):
+                rule_id = "third-party-transfer"
+                proc = tx['processor']
+                
+                # Assume non-EU for these examples
+                is_non_eu = proc in ['twilio', 'sendgrid', 'stripe']
+                arts = ["Art. 28", "Art. 44-49"] if is_non_eu else ["Art. 28"]
+                req = REQUIREMENTS["Art. 44-49"] if is_non_eu else REQUIREMENTS["Art. 28"]
+                
+                finding = Finding(
+                    category=Category.SECURITY.value,
+                    severity="high",
+                    file=tx["file"],
+                    line=tx["line"],
+                    message=f"Personal data '{tx['field']}' transmitted to external service ({proc})",
+                    rule_id=rule_id,
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
+                    priority="P2",
+                    title=f"GDPR: {rule_id}",
+                    evidence=FindingEvidence(code_context="AST extracted node"),
+                    detected_by=["data-flow-extractor"],
+                    merge_blocking=False,
+                    compliance_finding_type=ComplianceFindingType.THIRD_PARTY_RISK,
+                    gdpr_references=arts,
+                    code_context=req
+                )
+                deduped_findings.append(finding)
+                
+            # 4. Unprotected Storage
+            for store in flow_data.get("unprotected_storage", []):
+                rule_id = "unprotected-pii-storage"
+                finding = Finding(
+                    category=Category.SECURITY.value,
+                    severity="high",
+                    file=store["file"],
+                    line=store["line"],
+                    message=f"Personal data '{store['field']}' stored without detected encryption/hashing",
+                    rule_id=rule_id,
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
+                    priority="P1",
+                    title=f"GDPR: {rule_id}",
+                    evidence=FindingEvidence(code_context="AST extracted node"),
+                    detected_by=["data-flow-extractor"],
+                    merge_blocking=True,
+                    compliance_finding_type=ComplianceFindingType.SECURITY_GAP,
+                    gdpr_references=["Art. 32"],
+                    code_context=REQUIREMENTS["Art. 32"]
+                )
+                deduped_findings.append(finding)
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
+        
+        try:
+            from src.compliance.security_evidence import cross_reference_security
+            from src.compliance.suppression import filter_suppressed_findings
+            
+            # Cross-reference security
+            gdpr_items = [f for f in deduped_findings if f.compliance_finding_type is not None]
+            sec_gaps = cross_reference_security(gdpr_items, deduped_findings)
+            deduped_findings.extend(sec_gaps)
+            
+            # Filter suppressions
+            deduped_findings, dismissed_count = filter_suppressed_findings(deduped_findings, repo_path)
+            self.dismissed_count = dismissed_count
+        except Exception as e:
+            print(f"Compliance processing error: {e}")
+            self.dismissed_count = 0
+            
         self.enrich_findings(deduped_findings, repo_path)
+
         
         # Build category summaries
         summary: Dict[str, CategorySummary] = {}

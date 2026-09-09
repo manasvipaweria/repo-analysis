@@ -124,6 +124,24 @@ def main():
             print(f"[*] CSV report saved to {csv_file}")
             
         print("\n--- Analysis Summary ---")
+        
+        # GDPR summary section
+        from src.core.models import ComplianceFindingType
+        gdpr_findings = [f for f in report.findings if getattr(f, 'compliance_finding_type', None) is not None]
+        if gdpr_findings:
+            inventory = [f for f in gdpr_findings if f.compliance_finding_type == ComplianceFindingType.INVENTORY]
+            third_party = [f for f in gdpr_findings if f.compliance_finding_type == ComplianceFindingType.THIRD_PARTY_RISK]
+            security = [f for f in gdpr_findings if f.compliance_finding_type == ComplianceFindingType.SECURITY_GAP]
+            minimisation = [f for f in gdpr_findings if f.compliance_finding_type == ComplianceFindingType.MINIMISATION_FLAG]
+            human = [f for f in gdpr_findings if f.compliance_finding_type == ComplianceFindingType.HUMAN_REVIEW]
+            
+            print(f"Personal Data Inventory: {len(inventory)} items")
+            print(f"Third-Party Transfer Risk: {len(third_party)}")
+            print(f"Security Gaps: {len(security)}")
+            print(f"Minimisation Flags: {len(minimisation)}")
+            print(f"Human/Legal Review Required: {len(human)}")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

@@ -21,26 +21,80 @@ try {
         outbound_calls: [],
         api_endpoints: [],
         pii_fields: [],
-        db_destinations: []
+        db_destinations: [],
+        unused_pii_fields: [],
+        third_party_transfers: [],
+        unprotected_storage: []
     };
 
     const piiKeywords = ['email', 'password', 'ssn', 'phone', 'address', 'dob', 'credit card', 'card number', 'blood type', 'social security number'];
+    const knownProcessors = ['twilio', 'sendgrid', 'stripe'];
 
     function isPiiField(keyName) {
         if (!keyName) return false;
-        // Normalize camelCase and special chars to spaces
         const spaced = keyName.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^a-zA-Z0-9]/g, ' ').toLowerCase();
-        
         return piiKeywords.some(k => {
             const regex = new RegExp(`\\b${k}\\b`, 'i');
             return regex.test(spaced);
         });
     }
-
+    
+    let activeProcessors = new Set();
+    
     traverse(ast, {
+        ImportDeclaration(path) {
+            const source = path.node.source.value.toLowerCase();
+            for (const proc of knownProcessors) {
+                if (source.includes(proc)) activeProcessors.add(proc);
+            }
+        },
         CallExpression(path) {
             const callee = path.node.callee;
-            // Detect fetch() or axios()
+            // Require calls
+            if (callee.type === 'Identifier' && callee.name === 'require') {
+                if (path.node.arguments.length > 0 && path.node.arguments[0].type === 'StringLiteral') {
+                    const source = path.node.arguments[0].value.toLowerCase();
+                    for (const proc of knownProcessors) {
+                        if (source.includes(proc)) activeProcessors.add(proc);
+                    }
+                }
+            }
+            
+            let calledProcessor = null;
+            if (callee.type === 'MemberExpression' && callee.object && callee.object.name) {
+                 const objName = callee.object.name.toLowerCase();
+                 if (knownProcessors.includes(objName)) {
+                     calledProcessor = objName;
+                 }
+            }
+            
+            if (calledProcessor || activeProcessors.size > 0) {
+                const processor = calledProcessor || Array.from(activeProcessors)[0];
+                path.node.arguments.forEach(arg => {
+                    if (arg.type === 'ObjectExpression') {
+                        arg.properties.forEach(prop => {
+                            if (prop.type === 'ObjectProperty') {
+                                let keyName = prop.key.name || (prop.key.type === 'StringLiteral' ? prop.key.value : null);
+                                if (isPiiField(keyName)) {
+                                    extraction.third_party_transfers.push({
+                                        field: keyName,
+                                        processor: processor,
+                                        line: path.node.loc.start.line
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    if (arg.type === 'Identifier' && isPiiField(arg.name)) {
+                        extraction.third_party_transfers.push({
+                            field: arg.name,
+                            processor: processor,
+                            line: path.node.loc.start.line
+                        });
+                    }
+                });
+            }
+
             let isOutbound = false;
             if (callee.type === 'Identifier' && callee.name === 'fetch') {
                 isOutbound = true;
@@ -62,7 +116,6 @@ try {
                 }
             }
             
-            // Detect Express routing (app.get, router.post, etc)
             if (callee.type === 'MemberExpression') {
                 const objName = callee.object.name;
                 const propName = callee.property.name;
@@ -77,8 +130,51 @@ try {
                 }
             }
         },
+        NewExpression(path) {
+            const callee = path.node.callee;
+            if (callee.type === 'MemberExpression' && callee.object.name === 'mongoose' && callee.property.name === 'Schema') {
+                if (path.node.arguments.length > 0 && path.node.arguments[0].type === 'ObjectExpression') {
+                    path.node.arguments[0].properties.forEach(prop => {
+                        if (prop.type === 'ObjectProperty') {
+                            let keyName = prop.key.name || (prop.key.type === 'StringLiteral' ? prop.key.value : null);
+                            if (isPiiField(keyName) && prop.value.type === 'ObjectExpression') {
+                                let typeIsString = false;
+                                prop.value.properties.forEach(innerProp => {
+                                    if (innerProp.type === 'ObjectProperty' && innerProp.key.name === 'type') {
+                                        if (innerProp.value.name === 'String') typeIsString = true;
+                                    }
+                                });
+                                if (typeIsString) {
+                                    extraction.unprotected_storage.push({
+                                        field: keyName,
+                                        line: prop.loc.start.line
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        },
+        VariableDeclarator(path) {
+            if (path.node.id.type === 'ObjectPattern') {
+                path.node.id.properties.forEach(prop => {
+                    if (prop.type === 'ObjectProperty' && prop.value.type === 'Identifier') {
+                        let keyName = prop.value.name;
+                        if (isPiiField(keyName)) {
+                            const binding = path.scope.getBinding(keyName);
+                            if (binding && binding.references === 0) {
+                                extraction.unused_pii_fields.push({
+                                    field: keyName,
+                                    line: prop.loc.start.line
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+        },
         ObjectProperty(path) {
-            // Detect potential PII fields in object definitions (e.g. models or payloads)
             let keyName = null;
             if (path.node.key.type === 'Identifier') {
                 keyName = path.node.key.name;
@@ -94,10 +190,8 @@ try {
             }
         },
         JSXAttribute(path) {
-            // Check for defaultChecked={true} for consent
             if (path.node.name && path.node.name.name === 'defaultChecked') {
                 if (path.node.value && path.node.value.type === 'JSXExpressionContainer' && path.node.value.expression.type === 'BooleanLiteral' && path.node.value.expression.value === true) {
-                     // Check if it's a checkbox
                      const parent = path.parent;
                      if (parent && parent.name && parent.name.name === 'input') {
                          const typeAttr = parent.attributes.find(a => a.name && a.name.name === 'type');
@@ -116,6 +210,5 @@ try {
     console.log(JSON.stringify(extraction));
 
 } catch (err) {
-    // Return empty on parse fail
     console.log(JSON.stringify({ error: err.message, file: filePath }));
 }
