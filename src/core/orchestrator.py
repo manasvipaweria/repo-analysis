@@ -48,14 +48,45 @@ class Orchestrator:
             
             flow_data = extract_data_flow(repo_path)
             
-            # 1. Base Inventory
+            # 1. Base Inventory - Consolidated by Personal Data Field/Type
+            inventory_map = {}
+            consent_checkboxes = []
+            
             for pii in flow_data.get("pii_fields", []):
-                rule_id = "personal-data-field-detected"
-                msg = f"Personal data detected: {pii['field']}"
                 if pii["field"] == "defaultChecked_checkbox":
-                    rule_id = "consent-checkbox-default"
-                    msg = "Consent-related UI element detected; legal adequacy requires review."
+                    consent_checkboxes.append(pii)
+                else:
+                    field_key = pii["field"]
+                    if field_key not in inventory_map:
+                        inventory_map[field_key] = []
+                    inventory_map[field_key].append(pii)
                     
+            for field, pii_list in inventory_map.items():
+                rule_id = "personal-data-field-detected"
+                msg = f"Personal data field '{field}' detected across {len(pii_list)} source location(s)."
+                locs_text = "\n".join([f"- {item['file']}:{item['line']}" for item in pii_list])
+                
+                finding = Finding(
+                    category=Category.PRIVACY.value,
+                    severity="info",
+                    file=pii_list[0]["file"],
+                    line=pii_list[0]["line"],
+                    message=msg,
+                    rule_id=rule_id,
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
+                    priority="P3",
+                    title=f"GDPR Inventory: {field}",
+                    evidence=FindingEvidence(code_context=f"Detected across {len(pii_list)} location(s):\n{locs_text}"),
+                    detected_by=["data-flow-extractor"],
+                    merge_blocking=False,
+                    compliance_finding_type=ComplianceFindingType.INVENTORY
+                )
+                deduped_findings.append(finding)
+
+            for pii in consent_checkboxes:
+                rule_id = "consent-checkbox-default"
+                msg = "Consent-related UI element detected; legal adequacy requires review."
                 finding = Finding(
                     category=Category.PRIVACY.value,
                     severity="info",
@@ -67,33 +98,31 @@ class Orchestrator:
                     status="OPEN",
                     priority="P3",
                     title=f"GDPR: {rule_id}",
-                    evidence=FindingEvidence(code_context="AST extracted node"),
+                    evidence=FindingEvidence(code_context="Consent UI element"),
                     detected_by=["data-flow-extractor"],
                     merge_blocking=False,
                     compliance_finding_type=ComplianceFindingType.INVENTORY
                 )
                 deduped_findings.append(finding)
                 
-                # Human review for consent UI
-                if pii["field"] == "defaultChecked_checkbox":
-                    deduped_findings.append(Finding(
-                        category=Category.PRIVACY.value,
-                        severity="info",
-                        file=pii["file"],
-                        line=pii["line"],
-                        message="Verify whether the consent language and user flow are legally adequate for informed consent.",
-                        rule_id="human-review-consent",
-                        finding_id=str(uuid.uuid4()),
-                        status="OPEN",
-                        priority="P3",
-                        title="GDPR: human-review-consent",
-                        evidence=FindingEvidence(code_context="Consent UI element"),
-                        detected_by=["data-flow-extractor"],
-                        merge_blocking=False,
-                        compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
-                        gdpr_references=["Art. 7"],
-                        code_context=REQUIREMENTS.get("HR_CONSENT", "")
-                    ))
+                deduped_findings.append(Finding(
+                    category=Category.PRIVACY.value,
+                    severity="info",
+                    file=pii["file"],
+                    line=pii["line"],
+                    message="Verify whether the consent language and user flow are legally adequate for informed consent.",
+                    rule_id="human-review-consent",
+                    finding_id=str(uuid.uuid4()),
+                    status="OPEN",
+                    priority="P3",
+                    title="GDPR: human-review-consent",
+                    evidence=FindingEvidence(code_context="Consent UI element"),
+                    detected_by=["data-flow-extractor"],
+                    merge_blocking=False,
+                    compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
+                    gdpr_references=["Art. 7"],
+                    code_context=REQUIREMENTS.get("HR_CONSENT", "")
+                ))
                 
             # 2. Unused PII -> MINIMISATION_FLAG
             for pii in flow_data.get("unused_pii_fields", []):
@@ -320,7 +349,8 @@ class Orchestrator:
                             end = min(len(lines), line_num + 2)
                             if not f.evidence:
                                 f.evidence = __import__('src.core.models', fromlist=['FindingEvidence']).FindingEvidence()
-                            f.evidence.code_context = "".join(lines[start:end])
+                            if not f.evidence.code_context:
+                                f.evidence.code_context = "".join(lines[start:end])
                     except Exception:
                         pass
             
