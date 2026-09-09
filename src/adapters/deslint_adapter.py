@@ -84,6 +84,9 @@ class DeslintAdapter(BaseAdapter):
 
 export default [
   {
+    ignores: ['dist/**', 'build/**', 'coverage/**', 'node_modules/**', '.next/**']
+  },
+  {
     files: ['**/*.{js,jsx,ts,tsx}'],
     ignores: ['**/__tests__/**', '**/node_modules/**', '**/*.test.*', '**/*.spec.*'],
     plugins: { deslint },
@@ -172,6 +175,8 @@ export default [
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(config_content)
                 
+            subprocess.run("npm install --no-fund --no-audit", cwd=react_dir, shell=True, capture_output=True)
+            
             cmd = "npx eslint -c .deslint.config.mjs . -f json"
             result = subprocess.run(
                 cmd,

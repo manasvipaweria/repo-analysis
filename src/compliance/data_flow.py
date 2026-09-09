@@ -60,6 +60,9 @@ def extract_data_flow(repo_path: str) -> Dict[str, Any]:
         for pii in res.get("unprotected_storage", []):
             pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
             compiled["unprotected_storage"].append(pii)
+        for pii in res.get("db_destinations", []):
+            pii["file"] = os.path.relpath(res["file"], repo_path).replace("\\", "/")
+            compiled["db_destinations"].append(pii)
             
     # Run dependency-cruiser to supplement
     try:

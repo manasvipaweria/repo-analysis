@@ -38,38 +38,101 @@ try {
             return regex.test(spaced);
         });
     }
+
+    let processorInstances = new Set(knownProcessors);
+    let processorWrappers = new Set();
     
-    let activeProcessors = new Set();
-    
+    // PASS 1: Identify processor instances and wrappers
     traverse(ast, {
         ImportDeclaration(path) {
             const source = path.node.source.value.toLowerCase();
             for (const proc of knownProcessors) {
-                if (source.includes(proc)) activeProcessors.add(proc);
+                if (source.includes(proc)) {
+                    path.node.specifiers.forEach(spec => {
+                        if (spec.local && spec.local.name) {
+                            processorInstances.add(spec.local.name);
+                        }
+                    });
+                }
             }
         },
-        CallExpression(path) {
-            const callee = path.node.callee;
-            // Require calls
-            if (callee.type === 'Identifier' && callee.name === 'require') {
-                if (path.node.arguments.length > 0 && path.node.arguments[0].type === 'StringLiteral') {
-                    const source = path.node.arguments[0].value.toLowerCase();
-                    for (const proc of knownProcessors) {
-                        if (source.includes(proc)) activeProcessors.add(proc);
+        VariableDeclarator(path) {
+            if (path.node.init && path.node.init.type === 'CallExpression') {
+                const callee = path.node.init.callee;
+                if (callee.type === 'Identifier' && callee.name === 'require') {
+                    if (path.node.init.arguments.length > 0 && path.node.init.arguments[0].type === 'StringLiteral') {
+                        const source = path.node.init.arguments[0].value.toLowerCase();
+                        for (const proc of knownProcessors) {
+                            if (source.includes(proc) && path.node.id.type === 'Identifier') {
+                                processorInstances.add(path.node.id.name);
+                            }
+                        }
+                    }
+                }
+                
+                if (callee.type === 'Identifier' && processorInstances.has(callee.name)) {
+                    if (path.node.id.type === 'Identifier') {
+                        processorInstances.add(path.node.id.name);
                     }
                 }
             }
+        },
+        CallExpression(path) {
+            let isProcessorCall = false;
+            let callee = path.node.callee;
             
-            let calledProcessor = null;
-            if (callee.type === 'MemberExpression' && callee.object && callee.object.name) {
-                 const objName = callee.object.name.toLowerCase();
-                 if (knownProcessors.includes(objName)) {
-                     calledProcessor = objName;
-                 }
+            if (callee.type === 'Identifier' && processorInstances.has(callee.name)) {
+                isProcessorCall = true;
+            }
+            if (callee.type === 'MemberExpression') {
+                let obj = callee.object;
+                while (obj && obj.type === 'MemberExpression') obj = obj.object;
+                if (obj && obj.type === 'Identifier' && processorInstances.has(obj.name)) {
+                    isProcessorCall = true;
+                }
             }
             
-            if (calledProcessor) {
-                const processor = calledProcessor;
+            if (isProcessorCall) {
+                const funcParent = path.getFunctionParent();
+                if (funcParent && funcParent.node.id && funcParent.node.id.name) {
+                    processorWrappers.add(funcParent.node.id.name);
+                }
+                if (funcParent && funcParent.parentPath && funcParent.parentPath.node.type === 'VariableDeclarator') {
+                    if (funcParent.parentPath.node.id.type === 'Identifier') {
+                        processorWrappers.add(funcParent.parentPath.node.id.name);
+                    }
+                }
+            }
+        }
+    });
+
+    // PASS 2: Extract data flows
+    traverse(ast, {
+        CallExpression(path) {
+            let isProcessorCall = false;
+            let callee = path.node.callee;
+            let processorName = 'unknown-processor';
+
+            if (callee.type === 'Identifier' && (processorInstances.has(callee.name) || processorWrappers.has(callee.name))) {
+                isProcessorCall = true;
+                processorName = callee.name;
+                if (processorWrappers.has(callee.name)) {
+                    processorName = `wrapper[${callee.name}]`;
+                }
+            }
+            if (callee.type === 'MemberExpression') {
+                let obj = callee.object;
+                while (obj && obj.type === 'MemberExpression') obj = obj.object;
+                if (obj && obj.type === 'Identifier' && (processorInstances.has(obj.name) || processorWrappers.has(obj.name))) {
+                    isProcessorCall = true;
+                    processorName = obj.name;
+                    if (processorWrappers.has(obj.name)) {
+                         processorName = `wrapper[${obj.name}]`;
+                    }
+                }
+            }
+
+            if (isProcessorCall) {
                 path.node.arguments.forEach(arg => {
                     if (arg.type === 'ObjectExpression') {
                         arg.properties.forEach(prop => {
@@ -78,7 +141,7 @@ try {
                                 if (isPiiField(keyName)) {
                                     extraction.third_party_transfers.push({
                                         field: keyName,
-                                        processor: processor,
+                                        processor: processorName,
                                         line: path.node.loc.start.line
                                     });
                                 }
@@ -88,7 +151,14 @@ try {
                     if (arg.type === 'Identifier' && isPiiField(arg.name)) {
                         extraction.third_party_transfers.push({
                             field: arg.name,
-                            processor: processor,
+                            processor: processorName,
+                            line: path.node.loc.start.line
+                        });
+                    }
+                    if (arg.type === 'MemberExpression' && arg.property.type === 'Identifier' && isPiiField(arg.property.name)) {
+                        extraction.third_party_transfers.push({
+                            field: arg.property.name,
+                            processor: processorName,
                             line: path.node.loc.start.line
                         });
                     }
@@ -149,6 +219,12 @@ try {
                                         field: keyName,
                                         line: prop.loc.start.line
                                     });
+                                    // Add DB destination for consistency
+                                    extraction.db_destinations.push({
+                                        field: keyName,
+                                        destination: "MongoDB",
+                                        line: prop.loc.start.line
+                                    });
                                 }
                             }
                         }
@@ -191,7 +267,8 @@ try {
         },
         JSXAttribute(path) {
             if (path.node.name && path.node.name.name === 'defaultChecked') {
-                if (path.node.value && path.node.value.type === 'JSXExpressionContainer' && path.node.value.expression.type === 'BooleanLiteral' && path.node.value.expression.value === true) {
+                const hasValue = path.node.value === null || (path.node.value && path.node.value.type === 'JSXExpressionContainer' && path.node.value.expression.type === 'BooleanLiteral' && path.node.value.expression.value === true);
+                if (hasValue) {
                      const parent = path.parent;
                      if (parent && parent.name && parent.name.name === 'input') {
                          const typeAttr = parent.attributes.find(a => a.name && a.name.name === 'type');

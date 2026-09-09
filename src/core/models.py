@@ -11,12 +11,16 @@ class Severity(str, Enum):
 
 class Category(str, Enum):
     SECURITY = "security"
+    DEPENDENCIES = "dependency_security"
+    PRIVACY = "privacy"
     ARCHITECTURE = "architecture"
+    UI_DESIGN = "ui_design"
+    AI_DESIGN = "ai_design"
     QUALITY = "quality"
     PERFORMANCE = "performance"
-    DEPENDENCIES = "dependencies"
     TESTING = "testing"
     TYPING = "typing"
+
 
 class ComplianceFindingType(str, Enum):
     INVENTORY = "inventory"                 # personal data detected, no risk indicator attached

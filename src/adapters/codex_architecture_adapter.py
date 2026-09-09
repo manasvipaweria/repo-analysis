@@ -27,7 +27,7 @@ class CodexArchitectureAdapter(BaseAdapter):
         try:
             for root, dirs, files in os.walk(repo_path):
                 # Ignore common hidden/build dirs
-                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ('node_modules', 'dist', 'build', '__pycache__')]
+                dirs[:] = [d for d in dirs if (not d.startswith('.') or d == '.github') and d not in ('node_modules', 'dist', 'build', '__pycache__')]
                 
                 rel_path = os.path.relpath(root, repo_path)
                 level = rel_path.count(os.sep) if rel_path != '.' else 0
@@ -48,6 +48,11 @@ class CodexArchitectureAdapter(BaseAdapter):
             'package.json', 'pom.xml', 'docker-compose.yml', 
             'README.md', 'architecture.md', 'requirements.txt'
         ]
+        import glob
+        wf_files = glob.glob(os.path.join(repo_path, '.github', 'workflows', '*.yml'))
+        wf_files.extend(glob.glob(os.path.join(repo_path, '.github', 'workflows', '*.yaml')))
+        for wf in wf_files:
+            structural_files.append(os.path.relpath(wf, repo_path))
         
         for sf in structural_files:
             sf_path = os.path.join(repo_path, sf)
@@ -134,10 +139,11 @@ class CodexArchitectureAdapter(BaseAdapter):
                 message=summary_desc.strip(),
                 rule_id="arch-summary",
                 detected_by=[self.tool_name],
-                code_context=""
+                code_context="Analyzed from project structure."
             ))
             
             for raw_f in findings_data:
+                context_str = raw_f.get("code_context", "Analyzed from project structure.")
                 findings.append(Finding(
                     category=Category.ARCHITECTURE.value,
                     severity=raw_f.get("severity", "medium").lower(),
@@ -146,7 +152,7 @@ class CodexArchitectureAdapter(BaseAdapter):
                     message=raw_f.get("message", ""),
                     rule_id=raw_f.get("rule_id", "arch-finding"),
                     detected_by=[self.tool_name],
-                    code_context=""
+                    code_context=context_str
                 ))
                 
             return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=findings)

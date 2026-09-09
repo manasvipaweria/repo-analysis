@@ -54,10 +54,10 @@ class Orchestrator:
                 msg = f"Personal data detected: {pii['field']}"
                 if pii["field"] == "defaultChecked_checkbox":
                     rule_id = "consent-checkbox-default"
-                    msg = f"Consent UI component: {pii['field']}"
+                    msg = "Consent-related UI element detected; legal adequacy requires review."
                     
                 finding = Finding(
-                    category=Category.SECURITY.value,
+                    category=Category.PRIVACY.value,
                     severity="info",
                     file=pii["file"],
                     line=pii["line"],
@@ -77,11 +77,11 @@ class Orchestrator:
                 # Human review for consent UI
                 if pii["field"] == "defaultChecked_checkbox":
                     deduped_findings.append(Finding(
-                        category=Category.SECURITY.value,
+                        category=Category.PRIVACY.value,
                         severity="info",
                         file=pii["file"],
                         line=pii["line"],
-                        message="Consent UI element requires legal review.",
+                        message="Verify whether the consent language and user flow are legally adequate for informed consent.",
                         rule_id="human-review-consent",
                         finding_id=str(uuid.uuid4()),
                         status="OPEN",
@@ -91,6 +91,7 @@ class Orchestrator:
                         detected_by=["data-flow-extractor"],
                         merge_blocking=False,
                         compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
+                        gdpr_references=["Art. 7"],
                         code_context=REQUIREMENTS.get("HR_CONSENT", "")
                     ))
                 
@@ -98,7 +99,7 @@ class Orchestrator:
             for pii in flow_data.get("unused_pii_fields", []):
                 rule_id = "unused-personal-data"
                 finding = Finding(
-                    category=Category.SECURITY.value,
+                    category=Category.PRIVACY.value,
                     severity="medium",
                     file=pii["file"],
                     line=pii["line"],
@@ -118,88 +119,107 @@ class Orchestrator:
                 deduped_findings.append(finding)
                 
             # 3. Third-party transfers
+            
+            # Deduplicate by processor and field
+            tp_map = {}
             for tx in flow_data.get("third_party_transfers", []):
-                rule_id = "third-party-transfer"
-                proc = tx['processor']
+                key = (tx['processor'], tx['field'])
+                if key not in tp_map:
+                    tp_map[key] = []
+                tp_map[key].append(tx)
                 
-                is_non_eu = proc in ['twilio', 'sendgrid', 'stripe']
-                arts = ["Art. 28", "Art. 44-49"] if is_non_eu else ["Art. 28"]
-                req = REQUIREMENTS["Art. 44-49"] if is_non_eu else REQUIREMENTS["Art. 28"]
+            seen_processors = set()
+            
+            for (proc, field), tx_list in tp_map.items():
+                rule_id = "third-party-transfer"
+                
+                # Combine locations
+                locs_text = "\n".join([f"- {t['file']}:{t['line']}" for t in tx_list])
                 
                 finding = Finding(
-                    category=Category.SECURITY.value,
-                    severity="high",
-                    file=tx["file"],
-                    line=tx["line"],
-                    message=f"Personal data '{tx['field']}' transmitted to external service ({proc})",
+                    category=Category.PRIVACY.value,
+                    severity="info",
+                    file=tx_list[0]["file"],
+                    line=tx_list[0]["line"],
+                    message=f"Personal data '{field}' is transmitted to an external processor/service ({proc}).",
                     rule_id=rule_id,
                     finding_id=str(uuid.uuid4()),
                     status="OPEN",
-                    priority="P2",
+                    priority="P3",
                     title=f"GDPR: {rule_id}",
-                    evidence=FindingEvidence(code_context="AST extracted node"),
+                    evidence=FindingEvidence(code_context=f"Found at multiple locations:\n{locs_text}"),
                     detected_by=["data-flow-extractor"],
                     merge_blocking=False,
                     compliance_finding_type=ComplianceFindingType.THIRD_PARTY_RISK,
-                    gdpr_references=arts,
-                    code_context=req
+                    gdpr_references=["Art. 28", "Art. 44-49"],
+                    code_context="International-transfer applicability could not be determined from source code."
                 )
                 deduped_findings.append(finding)
                 
                 # Human review for 3rd party
-                deduped_findings.append(Finding(
-                    category=Category.SECURITY.value,
-                    severity="info",
-                    file=tx["file"],
-                    line=tx["line"],
-                    message=f"Third party processor ({proc}) requires legal review",
-                    rule_id="human-review-processor",
-                    finding_id=str(uuid.uuid4()),
-                    status="OPEN",
-                    priority="P3",
-                    title="GDPR: human-review-processor",
-                    evidence=FindingEvidence(code_context=proc),
-                    detected_by=["data-flow-extractor"],
-                    merge_blocking=False,
-                    compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
-                    code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
-                ))
-                
-                # Messaging Human review
-                if proc in ["twilio", "sendgrid"]:
+                if proc not in seen_processors:
+                    seen_processors.add(proc)
                     deduped_findings.append(Finding(
-                        category=Category.SECURITY.value,
+                        category=Category.PRIVACY.value,
                         severity="info",
-                        file=tx["file"],
-                        line=tx["line"],
-                        message="Cannot determine from source code whether this message is service-related or promotional; classification affects applicable consent requirements.",
-                        rule_id="human-review-messaging",
+                        file=tx_list[0]["file"],
+                        line=tx_list[0]["line"],
+                        message=f"Third party processor ({proc}) requires legal review for lawful basis, transparency, and processor-agreement adequacy.",
+                        rule_id="human-review-processor",
                         finding_id=str(uuid.uuid4()),
                         status="OPEN",
                         priority="P3",
-                        title="GDPR: human-review-messaging",
+                        title="GDPR: human-review-processor",
                         evidence=FindingEvidence(code_context=proc),
                         detected_by=["data-flow-extractor"],
                         merge_blocking=False,
                         compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
-                        code_context=REQUIREMENTS.get("HR_MESSAGING", "")
+                        code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
                     ))
+                    
+                    if proc in ["twilio", "sendgrid", "wrapper[sendMessageToRecipients]", "wrapper[sendNotification]", "wrapper[sendOne]", "wrapper[sendWhatsAppViaMeta]"]:
+                        deduped_findings.append(Finding(
+                            category=Category.PRIVACY.value,
+                            severity="info",
+                            file=tx_list[0]["file"],
+                            line=tx_list[0]["line"],
+                            message="Cannot determine from source code whether this message is service-related or promotional; classification affects applicable consent requirements.",
+                            rule_id="human-review-messaging",
+                            finding_id=str(uuid.uuid4()),
+                            status="OPEN",
+                            priority="P3",
+                            title="GDPR: human-review-messaging",
+                            evidence=FindingEvidence(code_context=proc),
+                            detected_by=["data-flow-extractor"],
+                            merge_blocking=False,
+                            compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
+                            code_context=REQUIREMENTS.get("HR_MESSAGING", "")
+                        ))
                 
             # 4. Unprotected Storage
+            # Group by field
+            store_map = {}
             for store in flow_data.get("unprotected_storage", []):
+                key = store["field"]
+                if key not in store_map:
+                    store_map[key] = []
+                store_map[key].append(store)
+                
+            for field, store_list in store_map.items():
                 rule_id = "unprotected-pii-storage"
+                locs_text = "\n".join([f"- {t['file']}:{t['line']}" for t in store_list])
                 finding = Finding(
-                    category=Category.SECURITY.value,
+                    category=Category.PRIVACY.value,
                     severity="info",
-                    file=store["file"],
-                    line=store["line"],
-                    message=f"Storage protection for '{store['field']}' could not be verified from application code (schema declares plain String type)",
+                    file=store_list[0]["file"],
+                    line=store_list[0]["line"],
+                    message=f"Storage protection for '{field}' could not be verified from application code. Verify encryption at rest, database access controls, transport security, and retention.",
                     rule_id=rule_id,
                     finding_id=str(uuid.uuid4()),
                     status="OPEN",
                     priority="P3",
                     title=f"GDPR: {rule_id}",
-                    evidence=FindingEvidence(code_context="AST extracted node"),
+                    evidence=FindingEvidence(code_context=f"Found at multiple locations:\n{locs_text}"),
                     detected_by=["data-flow-extractor"],
                     merge_blocking=False,
                     compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,

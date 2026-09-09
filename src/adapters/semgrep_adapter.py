@@ -26,7 +26,7 @@ class SemgrepAdapter(BaseAdapter):
             
         try:
             result = subprocess.run(
-                ["semgrep", "scan", "--config=auto", "--json", "."],
+                ["semgrep", "scan", "--config=auto", "--json", "--exclude", "dist/", "--exclude", "build/", "--exclude", "coverage/", "--exclude", "node_modules/", "--exclude", ".next/", "."],
                 cwd=repo_path,
                 capture_output=True,
                 text=True, encoding="utf-8", errors="replace"
