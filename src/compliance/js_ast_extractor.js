@@ -68,8 +68,8 @@ try {
                  }
             }
             
-            if (calledProcessor || activeProcessors.size > 0) {
-                const processor = calledProcessor || Array.from(activeProcessors)[0];
+            if (calledProcessor) {
+                const processor = calledProcessor;
                 path.node.arguments.forEach(arg => {
                     if (arg.type === 'ObjectExpression') {
                         arg.properties.forEach(prop => {

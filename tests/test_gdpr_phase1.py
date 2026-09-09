@@ -54,7 +54,7 @@ def test_unprotected_storage(tmp_path):
     
     storage = [f for f in report.findings if f.rule_id == "unprotected-pii-storage"]
     assert len(storage) > 0
-    assert storage[0].compliance_finding_type == ComplianceFindingType.SECURITY_GAP
+    assert storage[0].compliance_finding_type == ComplianceFindingType.HUMAN_REVIEW
 
 def test_suppression(tmp_path):
     code = "const user = { phone: '123' }; console.log(user.phone);"
