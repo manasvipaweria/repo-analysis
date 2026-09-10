@@ -94,6 +94,13 @@ class Finding:
     detected_evidence: Optional[str] = None    # What was found in the code (populated per-finding)
     recommended_action: Optional[str] = None   # What needs to be verified or changed
     human_review_required: Optional[str] = None  # Whether legal/human review is needed
+    # DPDP specific fields
+    framework: Optional[str] = None
+    section: Optional[str] = None
+    processing_basis: Optional[Dict[str, Any]] = None
+    effective_status: Optional[str] = None
+    effective_from: Optional[str] = None
+    evidence_status: Optional[str] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -108,6 +115,12 @@ class Finding:
         detected_evidence: Optional[str] = None,
         recommended_action: Optional[str] = None,
         human_review_required: Optional[str] = None,
+        framework: Optional[str] = None,
+        section: Optional[str] = None,
+        processing_basis: Optional[Dict[str, Any]] = None,
+        effective_status: Optional[str] = None,
+        effective_from: Optional[str] = None,
+        evidence_status: Optional[str] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -140,6 +153,12 @@ class Finding:
         self.detected_evidence = detected_evidence
         self.recommended_action = recommended_action
         self.human_review_required = human_review_required
+        self.framework = framework
+        self.section = section
+        self.processing_basis = processing_basis
+        self.effective_status = effective_status
+        self.effective_from = effective_from
+        self.evidence_status = evidence_status
 
 @dataclass
 class TestMetrics:
@@ -229,6 +248,12 @@ class Report:
                 detected_evidence=fd.get("detected_evidence"),
                 recommended_action=fd.get("recommended_action"),
                 human_review_required=fd.get("human_review_required"),
+                framework=fd.get("framework"),
+                section=fd.get("section"),
+                processing_basis=fd.get("processing_basis"),
+                effective_status=fd.get("effective_status"),
+                effective_from=fd.get("effective_from"),
+                evidence_status=fd.get("evidence_status"),
                 file=None,  # Legacy args
                 line=None,
                 message=""

@@ -142,6 +142,19 @@ def main():
             print(f"Human/Legal Review Required: {len(human)}")
             print("------------------------")
 
+        # DPDP summary section
+        dpdp_findings = [f for f in report.findings if getattr(f, 'framework', None) == "DPDP"]
+        if dpdp_findings:
+            in_force = [f for f in dpdp_findings if f.effective_status == "IN_FORCE"]
+            future_state = [f for f in dpdp_findings if f.effective_status == "FUTURE_STATE"]
+            dpdp_human = [f for f in dpdp_findings if f.human_review_required and f.human_review_required.startswith("YES")]
+            
+            print(f"DPDP Findings: {len(dpdp_findings)} total")
+            print(f"  - In Force (Tier 1): {len(in_force)}")
+            print(f"  - Future State (Tiers 2 & 3): {len(future_state)}")
+            print(f"  - Human/Legal Review Required: {len(dpdp_human)}")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

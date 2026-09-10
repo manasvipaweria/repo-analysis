@@ -256,6 +256,14 @@ class Orchestrator:
                 )
                 deduped_findings.append(finding)
 
+            # DPDP Act 2023 & DPDP Rules 2025 Engine Checks
+            try:
+                from src.compliance.dpdp_engine import run_dpdp_checks
+                dpdp_findings = run_dpdp_checks(repo_path, flow_data, deduped_findings)
+                deduped_findings.extend(dpdp_findings)
+            except Exception as e:
+                print(f"DPDP engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
