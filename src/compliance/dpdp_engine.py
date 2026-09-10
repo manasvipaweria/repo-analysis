@@ -243,12 +243,41 @@ def run_dpdp_checks(
     # =========================================================================
     sec = "8(6)"
     eff_status, eff_from = get_dpdp_tier_info(sec)
+    
+    # Determine §8(6) technical evidence state from shared evidence / repository signals:
+    logging_detected = False
+    missing_logging_flagged = False
+    
+    for f in shared_findings:
+        rule_lower = str(f.rule_id or "").lower()
+        if "missing-logging" in rule_lower or "no-logging" in rule_lower:
+            missing_logging_flagged = True
+        if "logging" in rule_lower or "sentry" in rule_lower or "winston" in rule_lower or "pino" in rule_lower:
+            if "missing" not in rule_lower:
+                logging_detected = True
+
+    if not logging_detected:
+        for call in outbound_calls:
+            target = str(call.get("target") or call.get("callee") or "").lower()
+            if any(term in target for term in ["sentry", "datadog", "pagerduty", "slack", "winston", "bunyan", "pino", "logger", "sns", "ses"]):
+                logging_detected = True
+
+    if logging_detected:
+        sec_8_6_ev_status = "DETECTED"
+        sec_8_6_msg = "Technical logging/alerting mechanisms detected for breach readiness under DPDP §8(6). Legal review required to verify Board and Data Principal notification workflows."
+    elif missing_logging_flagged:
+        sec_8_6_ev_status = "NOT_DETECTED"
+        sec_8_6_msg = "Technical breach logging/alerting mechanisms not identified in repository; incident response workflow requires manual verification under DPDP §8(6)."
+    else:
+        sec_8_6_ev_status = "INDETERMINATE"
+        sec_8_6_msg = "DPDP §8(6): Personal data breach notification pipeline requires Board and Data Principal notification mechanisms."
+
     dpdp_findings.append(Finding(
         category=Category.PRIVACY.value,
         severity="info",
         file=None,
         line=None,
-        message="DPDP §8(6): Personal data breach notification pipeline requires Board and Data Principal notification mechanisms.",
+        message=sec_8_6_msg,
         rule_id="dpdp-8-6-breach-notification",
         title=DPDP_REQUIREMENTS[sec]["title"],
         description="Verify technical logging, alerting, and incident response readiness to notify BOTH the Data Protection Board and ALL affected Data Principals in the event of a personal data breach. Note: DPDP §8(6) does not contain a GDPR-style high-risk severity gate.",
@@ -257,7 +286,7 @@ def run_dpdp_checks(
         section=sec,
         effective_status=eff_status,
         effective_from=eff_from,
-        evidence_status="INDETERMINATE",
+        evidence_status=sec_8_6_ev_status,
         human_review_required="YES — Incident response team must confirm notification capability for Board and affected Data Principals.",
         requirement=DPDP_REQUIREMENTS[sec]["requirement"],
         recommended_action=DPDP_REQUIREMENTS[sec]["recommended_action"],

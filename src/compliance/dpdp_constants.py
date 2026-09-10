@@ -36,7 +36,7 @@ def get_dpdp_tier_info(section: str) -> Tuple[str, str]:
 DEFAULT_DPDP_RESTRICTED_COUNTRIES: Dict[str, Any] = {
     "countries": [],
     "source": "MeitY Gazette notifications under Section 16",
-    "source_reference": "https://www.meity.gov.in/static/uploads/2024/02/Digital-Personal-Data-Protection-Act-2023.pdf",
+    "source_reference": "No Central Government Gazette notification restricting cross-border transfers currently identified under Section 16 (as of 2026-09-10).",
     "last_verified": "2026-09-10"
 }
 

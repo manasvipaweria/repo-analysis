@@ -75,7 +75,34 @@ def test_dpdp_8_6_does_not_use_gdpr_high_risk_threshold(tmp_path):
     f = breach_findings[0]
     assert f.framework == "DPDP"
     assert f.section == "8(6)"
+    assert f.evidence_status in ["INDETERMINATE", "DETECTED", "NOT_DETECTED"]
     assert "GDPR-style high-risk severity gate" in f.description or "Board" in f.description
+
+def test_dpdp_8_6_detected_logging_evidence(tmp_path):
+    """Verify DPDP §8(6) sets evidence_status='DETECTED' when logging tools are present."""
+    code = "const phone = user.phone;"
+    js = tmp_path / "App.js"
+    js.write_text(code, encoding="utf-8")
+
+    orc = Orchestrator([])
+    # Create mock adapter or finding to simulate logging detection
+    from src.adapters.base import BaseAdapter
+    from src.core.models import ToolResult, ToolStatus
+    class MockLoggingAdapter(BaseAdapter):
+        tool_name = "mock-logger"
+        categories = [Category.ARCHITECTURE.value]
+        def run(self, path):
+            return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=[
+                Finding(category=Category.ARCHITECTURE.value, severity="info", file="App.js", line=1, message="Logging detected", rule_id="winston-logging-detected")
+            ])
+
+    orc.adapters.append(MockLoggingAdapter())
+    report = orc.analyze("local", str(tmp_path))
+
+    breach_findings = [f for f in report.findings if f.rule_id == "dpdp-8-6-breach-notification"]
+    assert len(breach_findings) == 1
+    f = breach_findings[0]
+    assert f.evidence_status == "DETECTED"
 
 # -----------------------------------------------------------------------------
 # D. Cross-Border Transfer Isolation Tests (§16)
