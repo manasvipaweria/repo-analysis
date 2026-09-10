@@ -14,7 +14,7 @@ class ApniMandiDesignAdapter(BaseAdapter):
         
     @property
     def categories(self) -> List[str]:
-        return [Category.QUALITY.value]
+        return [Category.QUALITY.value, Category.AI_DESIGN.value]
         
     def _run_semgrep_static(self, repo_path: str) -> List[Finding]:
         rules_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "rules", "apnimandi-design.yaml")

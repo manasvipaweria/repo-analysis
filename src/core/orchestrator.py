@@ -279,10 +279,20 @@ class Orchestrator:
         self.enrich_findings(deduped_findings, repo_path)
 
         
+        def is_finding_in_category(f: Finding, cat: str) -> bool:
+            if f.category == cat:
+                return True
+            if cat == Category.AI_DESIGN.value:
+                if f.rule_id and f.rule_id.startswith("gemini/"):
+                    return True
+                if "apnimandi-design" in f.detected_by and f.rule_id and f.rule_id.startswith("gemini/"):
+                    return True
+            return False
+
         # Build category summaries
         summary: Dict[str, CategorySummary] = {}
         for cat, results in category_to_tools.items():
-            cat_findings_count = sum(1 for f in deduped_findings if f.category == cat)
+            cat_findings_count = sum(1 for f in deduped_findings if is_finding_in_category(f, cat))
             
             has_error = any(r.status == ToolStatus.ERROR for r in results)
             has_skipped = any(r.status == ToolStatus.SKIPPED for r in results)
@@ -303,7 +313,7 @@ class Orchestrator:
             for r in results:
                 tool_dict = {
                     "status": r.status.value,
-                    "finding_count": len([f for f in r.findings if f.category == cat])
+                    "finding_count": len([f for f in r.findings if is_finding_in_category(f, cat)])
                 }
                 if r.metrics:
                     tool_dict["metrics"] = {
