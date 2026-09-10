@@ -25,7 +25,7 @@ class CodexSecurityAdapter(BaseAdapter):
             "--format", "json", 
             "--headless", 
             "--effort", "low", 
-            "--max-cost", "5.00"
+            "--max-cost", "10.00"
         ]
         
         # Scope scan paths to source directories to exclude node_modules from cost estimation
