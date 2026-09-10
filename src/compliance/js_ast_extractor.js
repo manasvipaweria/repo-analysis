@@ -41,94 +41,209 @@ try {
 
     let processorInstances = new Set(knownProcessors);
     let processorWrappers = new Set();
-    
-    // PASS 1: Identify processor instances and wrappers
-    traverse(ast, {
-        ImportDeclaration(path) {
-            const source = path.node.source.value.toLowerCase();
-            for (const proc of knownProcessors) {
-                if (source.includes(proc)) {
-                    path.node.specifiers.forEach(spec => {
-                        if (spec.local && spec.local.name) {
-                            processorInstances.add(spec.local.name);
-                        }
-                    });
-                }
+    let processorMap = new Map();
+    knownProcessors.forEach(p => processorMap.set(p, p));
+    let piiAliases = new Map();
+
+    function isProcessEnv(node) {
+        if (!node) return false;
+        if (node.type === 'MemberExpression') {
+            if (node.object.type === 'Identifier' && node.object.name === 'process' && node.property.type === 'Identifier' && node.property.name === 'env') {
+                return true;
             }
-        },
-        VariableDeclarator(path) {
-            if (path.node.init && path.node.init.type === 'CallExpression') {
-                const callee = path.node.init.callee;
-                if (callee.type === 'Identifier' && callee.name === 'require') {
-                    if (path.node.init.arguments.length > 0 && path.node.init.arguments[0].type === 'StringLiteral') {
-                        const source = path.node.init.arguments[0].value.toLowerCase();
-                        for (const proc of knownProcessors) {
-                            if (source.includes(proc) && path.node.id.type === 'Identifier') {
+            return isProcessEnv(node.object);
+        }
+        return false;
+    }
+
+    function getPiiFieldFromExpression(node) {
+        if (!node) return null;
+        if (isProcessEnv(node)) return null;
+        if (node.type === 'Identifier') {
+            if (piiAliases.has(node.name)) return piiAliases.get(node.name);
+            if (isPiiField(node.name)) {
+                for (const k of piiKeywords) {
+                    if (new RegExp(`\\b${k}\\b`, 'i').test(node.name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase())) {
+                        return k;
+                    }
+                }
+                return node.name;
+            }
+        }
+        if (node.type === 'MemberExpression') {
+            if (node.property.type === 'Identifier') {
+                if (isPiiField(node.property.name)) {
+                    for (const k of piiKeywords) {
+                        if (new RegExp(`\\b${k}\\b`, 'i').test(node.property.name.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase())) {
+                            return k;
+                        }
+                    }
+                    return node.property.name;
+                }
+                if (piiAliases.has(node.property.name)) return piiAliases.get(node.property.name);
+            }
+        }
+        if (node.type === 'CallExpression') {
+            for (const arg of node.arguments) {
+                const found = getPiiFieldFromExpression(arg);
+                if (found) return found;
+            }
+        }
+        if (node.type === 'LogicalExpression' || node.type === 'BinaryExpression') {
+            return getPiiFieldFromExpression(node.left) || getPiiFieldFromExpression(node.right);
+        }
+        if (node.type === 'ConditionalExpression') {
+            return getPiiFieldFromExpression(node.consequent) || getPiiFieldFromExpression(node.alternate);
+        }
+        return null;
+    }
+    
+    // PASS 1A: Order-independent processor instance discovery
+    let addedNewInstance = true;
+    while (addedNewInstance) {
+        addedNewInstance = false;
+        traverse(ast, {
+            ImportDeclaration(path) {
+                const source = path.node.source.value.toLowerCase();
+                for (const proc of knownProcessors) {
+                    if (source.includes(proc)) {
+                        path.node.specifiers.forEach(spec => {
+                            if (spec.local && spec.local.name && !processorInstances.has(spec.local.name)) {
+                                processorInstances.add(spec.local.name);
+                                processorMap.set(spec.local.name, proc);
+                                addedNewInstance = true;
+                            }
+                        });
+                    }
+                }
+            },
+            VariableDeclarator(path) {
+                if (path.node.init) {
+                    let calls = [];
+                    if (path.node.init.type === 'CallExpression') calls.push(path.node.init);
+                    else if (path.node.init.type === 'ConditionalExpression') {
+                        if (path.node.init.consequent && path.node.init.consequent.type === 'CallExpression') calls.push(path.node.init.consequent);
+                        if (path.node.init.alternate && path.node.init.alternate.type === 'CallExpression') calls.push(path.node.init.alternate);
+                    }
+                    for (const call of calls) {
+                        const callee = call.callee;
+                        if (callee.type === 'Identifier' && callee.name === 'require') {
+                            if (call.arguments.length > 0 && call.arguments[0].type === 'StringLiteral') {
+                                const source = call.arguments[0].value.toLowerCase();
+                                for (const proc of knownProcessors) {
+                                    if (source.includes(proc) && path.node.id.type === 'Identifier' && !processorInstances.has(path.node.id.name)) {
+                                        processorInstances.add(path.node.id.name);
+                                        processorMap.set(path.node.id.name, proc);
+                                        addedNewInstance = true;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (callee.type === 'Identifier' && processorInstances.has(callee.name)) {
+                            if (path.node.id.type === 'Identifier' && !processorInstances.has(path.node.id.name)) {
+                                const baseProc = processorMap.get(callee.name) || callee.name;
                                 processorInstances.add(path.node.id.name);
+                                processorMap.set(path.node.id.name, baseProc);
+                                addedNewInstance = true;
                             }
                         }
                     }
                 }
+            }
+        });
+    }
+
+    // PASS 1B: Order-independent processor wrapper discovery
+    let addedNewWrapper = true;
+    while (addedNewWrapper) {
+        addedNewWrapper = false;
+        traverse(ast, {
+            CallExpression(path) {
+                let matchedProc = null;
+                let callee = path.node.callee;
                 
-                if (callee.type === 'Identifier' && processorInstances.has(callee.name)) {
-                    if (path.node.id.type === 'Identifier') {
-                        processorInstances.add(path.node.id.name);
+                if (callee.type === 'Identifier' && (processorInstances.has(callee.name) || processorWrappers.has(callee.name))) {
+                    matchedProc = processorMap.get(callee.name) || callee.name;
+                }
+                if (callee.type === 'MemberExpression') {
+                    let obj = callee.object;
+                    while (obj && obj.type === 'MemberExpression') obj = obj.object;
+                    if (obj && obj.type === 'Identifier' && (processorInstances.has(obj.name) || processorWrappers.has(obj.name))) {
+                        matchedProc = processorMap.get(obj.name) || obj.name;
                     }
+                }
+                path.node.arguments.forEach(arg => {
+                    if (arg.type === 'Identifier' && (processorInstances.has(arg.name) || processorWrappers.has(arg.name))) {
+                        matchedProc = matchedProc || processorMap.get(arg.name) || arg.name;
+                    }
+                });
+
+                if (matchedProc) {
+                    const funcParent = path.getFunctionParent();
+                    if (funcParent && funcParent.node.id && funcParent.node.id.name) {
+                        if (!processorWrappers.has(funcParent.node.id.name)) {
+                            processorWrappers.add(funcParent.node.id.name);
+                            processorMap.set(funcParent.node.id.name, matchedProc);
+                            addedNewWrapper = true;
+                        }
+                    }
+                    if (funcParent && funcParent.parentPath && funcParent.parentPath.node.type === 'VariableDeclarator') {
+                        if (funcParent.parentPath.node.id.type === 'Identifier') {
+                            if (!processorWrappers.has(funcParent.parentPath.node.id.name)) {
+                                processorWrappers.add(funcParent.parentPath.node.id.name);
+                                processorMap.set(funcParent.parentPath.node.id.name, matchedProc);
+                                addedNewWrapper = true;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // PASS 2: Track variable/parameter aliases and extract data flows
+    traverse(ast, {
+        VariableDeclarator(path) {
+            if (path.node.id && path.node.id.type === 'Identifier' && path.node.init) {
+                const foundPii = getPiiFieldFromExpression(path.node.init);
+                if (foundPii) {
+                    piiAliases.set(path.node.id.name, foundPii);
                 }
             }
         },
         CallExpression(path) {
-            let isProcessorCall = false;
             let callee = path.node.callee;
-            
-            if (callee.type === 'Identifier' && processorInstances.has(callee.name)) {
-                isProcessorCall = true;
-            }
-            if (callee.type === 'MemberExpression') {
-                let obj = callee.object;
-                while (obj && obj.type === 'MemberExpression') obj = obj.object;
-                if (obj && obj.type === 'Identifier' && processorInstances.has(obj.name)) {
-                    isProcessorCall = true;
-                }
-            }
-            
-            if (isProcessorCall) {
-                const funcParent = path.getFunctionParent();
-                if (funcParent && funcParent.node.id && funcParent.node.id.name) {
-                    processorWrappers.add(funcParent.node.id.name);
-                }
-                if (funcParent && funcParent.parentPath && funcParent.parentPath.node.type === 'VariableDeclarator') {
-                    if (funcParent.parentPath.node.id.type === 'Identifier') {
-                        processorWrappers.add(funcParent.parentPath.node.id.name);
-                    }
-                }
-            }
-        }
-    });
 
-    // PASS 2: Extract data flows
-    traverse(ast, {
-        CallExpression(path) {
+            // Parameter alias propagation on internal function calls
+            if (callee.type === 'Identifier') {
+                const funcBinding = path.scope.getBinding(callee.name);
+                if (funcBinding && (funcBinding.path.isFunctionDeclaration() || funcBinding.path.isFunctionExpression())) {
+                    const params = funcBinding.path.node.params;
+                    path.node.arguments.forEach((arg, idx) => {
+                        if (idx < params.length && params[idx].type === 'Identifier') {
+                            const piiField = getPiiFieldFromExpression(arg);
+                            if (piiField) {
+                                piiAliases.set(params[idx].name, piiField);
+                            }
+                        }
+                    });
+                }
+            }
+
             let isProcessorCall = false;
-            let callee = path.node.callee;
             let processorName = 'unknown-processor';
 
             if (callee.type === 'Identifier' && (processorInstances.has(callee.name) || processorWrappers.has(callee.name))) {
                 isProcessorCall = true;
-                processorName = callee.name;
-                if (processorWrappers.has(callee.name)) {
-                    processorName = `wrapper[${callee.name}]`;
-                }
+                processorName = processorMap.get(callee.name) || callee.name;
             }
             if (callee.type === 'MemberExpression') {
                 let obj = callee.object;
                 while (obj && obj.type === 'MemberExpression') obj = obj.object;
                 if (obj && obj.type === 'Identifier' && (processorInstances.has(obj.name) || processorWrappers.has(obj.name))) {
                     isProcessorCall = true;
-                    processorName = obj.name;
-                    if (processorWrappers.has(obj.name)) {
-                         processorName = `wrapper[${obj.name}]`;
-                    }
+                    processorName = processorMap.get(obj.name) || obj.name;
                 }
             }
 
@@ -138,9 +253,13 @@ try {
                         arg.properties.forEach(prop => {
                             if (prop.type === 'ObjectProperty') {
                                 let keyName = prop.key.name || (prop.key.type === 'StringLiteral' ? prop.key.value : null);
-                                if (isPiiField(keyName)) {
+                                let piiFromKey = isPiiField(keyName) ? keyName : null;
+                                let piiFromVal = getPiiFieldFromExpression(prop.value);
+                                let finalPii = piiFromKey || piiFromVal;
+
+                                if (finalPii) {
                                     extraction.third_party_transfers.push({
-                                        field: keyName,
+                                        field: finalPii,
                                         processor: processorName,
                                         line: path.node.loc.start.line
                                     });
@@ -148,16 +267,11 @@ try {
                             }
                         });
                     }
-                    if (arg.type === 'Identifier' && isPiiField(arg.name)) {
+                    
+                    const piiFromArg = getPiiFieldFromExpression(arg);
+                    if (piiFromArg) {
                         extraction.third_party_transfers.push({
-                            field: arg.name,
-                            processor: processorName,
-                            line: path.node.loc.start.line
-                        });
-                    }
-                    if (arg.type === 'MemberExpression' && arg.property.type === 'Identifier' && isPiiField(arg.property.name)) {
-                        extraction.third_party_transfers.push({
-                            field: arg.property.name,
+                            field: piiFromArg,
                             processor: processorName,
                             line: path.node.loc.start.line
                         });
