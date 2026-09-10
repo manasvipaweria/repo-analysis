@@ -155,6 +155,22 @@ def main():
             print(f"  - Human/Legal Review Required: {len(dpdp_human)}")
             print("------------------------")
 
+        # CRA summary section
+        from src.compliance.cra_engine import evaluate_cra_applicability
+        cra_app, cra_reason = evaluate_cra_applicability(repo_path)
+        cra_findings = [f for f in report.findings if getattr(f, 'cra_references', None) and len(f.cra_references) > 0]
+        if cra_findings:
+            part_i = [f for f in cra_findings if any(r.startswith("CRA-I-") for r in f.cra_references)]
+            part_ii = [f for f in cra_findings if any(r.startswith("CRA-II-") for r in f.cra_references)]
+            attestations = [f for f in cra_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"EU Cyber Resilience Act (CRA) Technical Readiness:")
+            print(f"  - Applicability State: {cra_app}")
+            print(f"  - Annex I, Part I (Security Properties): {len(part_i)} evidence items")
+            print(f"  - Annex I, Part II (Vulnerability Handling): {len(part_ii)} evidence items")
+            print(f"  - Organizational Attestations Required: {len(attestations)} checklist items")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

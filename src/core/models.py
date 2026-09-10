@@ -28,6 +28,8 @@ class ComplianceFindingType(str, Enum):
     SECURITY_GAP = "security_gap"           # personal data inadequately protected (Art. 32)
     MINIMISATION_FLAG = "minimisation_flag" # field collected but no downstream use detected
     HUMAN_REVIEW = "human_review"           # cannot be determined from source code
+    ATTESTATION_REQUIRED = "attestation_required" # non-code-verifiable CRA organizational requirement
+    VIOLATION = "violation"                 # deterministic technical violation
 
 class ToolStatus(str, Enum):
     COMPLETED = "COMPLETED"
@@ -52,20 +54,11 @@ class FindingLocation:
 @dataclass
 class FindingEvidence:
     code_context: Optional[str] = None
-    # Structured classification for inline-style findings. Values:
-    #   EXACT_MIGRATION       - has a verified Tailwind/design-system equivalent
-    #   TOKEN_CONTEXT_REQUIRED - uses a CSS custom property with no verified Tailwind utility
-    #   DYNAMIC_ALLOWED       - runtime/computed value, correct to be inline
-    #   TEST_FIXTURE          - intentional test file, not a production issue
-    #   UNCATEGORIZED         - default when classification is not applicable or undetermined
     classification: Optional[str] = None
-    # For EXACT_MIGRATION: the specific Tailwind class that replaces the inline style.
-    # Only set when the equivalence is verified against the actual design system.
     suggested_migration: Optional[str] = None
 
 @dataclass
 class AIFutureFields:
-    # Kept separate to ensure tool-generated data is distinct from future AI outputs.
     analysis_summary: Optional[str] = None
     security_impact: Optional[str] = None
     remediation_suggestion: Optional[str] = None
@@ -101,6 +94,8 @@ class Finding:
     effective_status: Optional[str] = None
     effective_from: Optional[str] = None
     evidence_status: Optional[str] = None
+    # CRA specific fields
+    cra_references: Optional[List[str]] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -121,6 +116,7 @@ class Finding:
         effective_status: Optional[str] = None,
         effective_from: Optional[str] = None,
         evidence_status: Optional[str] = None,
+        cra_references: Optional[List[str]] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -159,6 +155,7 @@ class Finding:
         self.effective_status = effective_status
         self.effective_from = effective_from
         self.evidence_status = evidence_status
+        self.cra_references = cra_references or []
 
 @dataclass
 class TestMetrics:
@@ -254,6 +251,7 @@ class Report:
                 effective_status=fd.get("effective_status"),
                 effective_from=fd.get("effective_from"),
                 evidence_status=fd.get("evidence_status"),
+                cra_references=fd.get("cra_references", []),
                 file=None,  # Legacy args
                 line=None,
                 message=""

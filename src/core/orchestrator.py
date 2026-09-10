@@ -264,6 +264,14 @@ class Orchestrator:
             except Exception as e:
                 print(f"DPDP engine execution error: {e}")
 
+            # EU Cyber Resilience Act (CRA) Engine Checks
+            try:
+                from src.compliance.cra_engine import run_cra_checks
+                cra_findings = run_cra_checks(repo_path, deduped_findings)
+                deduped_findings.extend(cra_findings)
+            except Exception as e:
+                print(f"CRA engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
@@ -393,12 +401,18 @@ class Orchestrator:
             from src.compliance.gdpr_mapping import get_gdpr_articles_for_rule
             articles = get_gdpr_articles_for_rule(f.rule_id)
             if not articles and f.detected_by:
-                # Fallback to checking tool name if rule_id didn't match directly
-                # E.g. for snyk or bandit which have dynamic rule IDs
                 for tool in f.detected_by:
                     articles.extend(get_gdpr_articles_for_rule(f"{tool}/*"))
             
             f.gdpr_references = list(set(articles))
+
+            # CRA Mapping
+            from src.compliance.cra_mapping import get_cra_references_for_rule
+            cra_refs = get_cra_references_for_rule(f.rule_id, f.detected_by)
+            if cra_refs:
+                existing_cra = set(f.cra_references or [])
+                existing_cra.update(cra_refs)
+                f.cra_references = sorted(list(existing_cra))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec
