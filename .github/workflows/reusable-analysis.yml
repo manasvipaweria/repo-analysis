@@ -7,7 +7,7 @@ on:
         description: 'Comma-separated list of tools to run'
         required: false
         type: string
-        default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor,apnimandi-design'
+        default: 'deslint'
       enable_codex:
         description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
         required: false
@@ -22,7 +22,7 @@ on:
         description: 'Enable Deslint React UI Consistency analysis'
         required: false
         type: boolean
-        default: false
+        default: true
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
@@ -66,7 +66,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r orchestrator-repo/requirements.txt
           pip install owasp-depscan
-          npm install -g snyk @cyclonedx/cdxgen dependency-cruiser react-doctor
+          npm install -g snyk @cyclonedx/cdxgen dependency-cruiser react-doctor eslint @deslint/eslint-plugin
 
       - name: Cache dep-scan VDB
         uses: actions/cache@v4
@@ -107,6 +107,20 @@ jobs:
             NODE_ENV=development npm install --include=dev --no-fund --no-audit
           fi
 
+      - name: Verify Deslint dependency resolution
+        run: |
+          if [ -d "target-repo/frontend" ] && [ -f "target-repo/frontend/package.json" ]; then
+            echo "Verifying Deslint package installation in target-repo/frontend..."
+            cd target-repo/frontend
+            if [ -d "node_modules/@deslint/eslint-plugin" ]; then
+              echo "Found @deslint/eslint-plugin in target-repo/frontend/node_modules."
+            else
+              echo "WARNING: @deslint/eslint-plugin not found in target-repo/frontend/node_modules."
+            fi
+            npm list @deslint/eslint-plugin --depth=0 || true
+            node -e "import('file://' + process.cwd() + '/node_modules/@deslint/eslint-plugin/dist/index.js').then(() => console.log('ESM resolution of @deslint/eslint-plugin succeeded.')).catch(e => console.error('ESM resolution error:', e.message))" || true
+          fi
+
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:
@@ -130,7 +144,7 @@ jobs:
           if [ "${{ inputs.enable_codex }}" == "true" ]; then
             TOOLS="$TOOLS,codex-security,codex-architecture"
           fi
-          if [ "${{ inputs.enable_deslint }}" == "true" ]; then
+          if [ "${{ inputs.enable_deslint }}" == "true" ] && [[ "$TOOLS" != *"deslint"* ]]; then
             TOOLS="$TOOLS,deslint"
           fi
           

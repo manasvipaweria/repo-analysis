@@ -80,7 +80,16 @@ class DeslintAdapter(BaseAdapter):
         #       Useful but requires theme-aware color resolution. Without knowing oklch
         #       values of all combinations, produces false positives. OFF for now.
 
-        config_content = """import deslint from '@deslint/eslint-plugin';
+        config_content = """let deslint;
+try {
+  deslint = (await import('@deslint/eslint-plugin')).default;
+} catch (e1) {
+  try {
+    deslint = (await import('./node_modules/@deslint/eslint-plugin/dist/index.js')).default;
+  } catch (e2) {
+    deslint = (await import('../node_modules/@deslint/eslint-plugin/dist/index.js')).default;
+  }
+}
 
 export default [
   {
@@ -198,15 +207,24 @@ export default [
                 )
 
             plugin_pkg_path = os.path.join(react_dir, "node_modules", "@deslint", "eslint-plugin")
-            if not os.path.exists(plugin_pkg_path):
+            parent_plugin_pkg_path = os.path.join(repo_path, "node_modules", "@deslint", "eslint-plugin")
+            if not os.path.exists(plugin_pkg_path) and not os.path.exists(parent_plugin_pkg_path):
                 return ToolResult(
                     tool=self.tool_name,
                     status=ToolStatus.ERROR,
                     findings=[],
-                    error_message=f"Cannot find package '@deslint/eslint-plugin' in {react_dir}. Dependency installation failed or package missing."
+                    error_message=f"Cannot find package '@deslint/eslint-plugin' in {react_dir} or {repo_path}. Dependency installation failed or package missing."
                 )
 
-            cmd = "npx eslint -c .deslint.config.mjs . -f json"
+            local_eslint_bin = os.path.join(react_dir, "node_modules", "eslint", "bin", "eslint.js")
+            parent_eslint_bin = os.path.join(repo_path, "node_modules", "eslint", "bin", "eslint.js")
+            if os.path.exists(local_eslint_bin):
+                cmd = f'node "{local_eslint_bin}" -c .deslint.config.mjs . -f json'
+            elif os.path.exists(parent_eslint_bin):
+                cmd = f'node "{parent_eslint_bin}" -c .deslint.config.mjs . -f json'
+            else:
+                cmd = "npx --no-install eslint -c .deslint.config.mjs . -f json"
+
             result = subprocess.run(
                 cmd,
                 cwd=react_dir,
