@@ -1,38 +1,26 @@
 """
 Compliance Rule Engine for US TCPA (Telephone Consumer Protection Act - 47 U.S.C. § 227 & 47 C.F.R. § 64.1200).
-Operates as a compliance evaluation layer on top of shared technical evidence graph and scanner findings.
+Consumes framework-neutral CommunicationFlowEvidence from shared Communication Channel Classifier.
 """
 
 import os
-import re
-
 from typing import List, Dict, Any, Optional, Tuple
+
 from src.core.models import Finding, Category, Severity, ComplianceFindingType, ToolStatus
 from src.compliance.tcpa_constants import (
     FRAMEWORK_TCPA,
     TCPA_EFFECTIVE_STATUS,
     TCPA_EFFECTIVE_FROM,
-    TCPA_CHANNELS,
-    TCPA_PURPOSES,
     TCPA_REQUIREMENTS
 )
-from src.compliance.tcpa_mapping import (
-    classify_communication_channel,
-    classify_communication_purpose,
-    get_tcpa_references_for_rule,
-    TELEPHONY_PROVIDERS,
-    VOICE_SPECIFIC_KEYWORDS,
-    SMS_SPECIFIC_KEYWORDS
-)
-
-EXCLUDE_DIRS = {".git", "node_modules", "venv", ".venv", "__pycache__", ".pytest_cache", "dist", "build"}
-OPT_OUT_KEYWORDS = ["stop", "unsubscribe", "cancel", "quit", "optout", "opt_out", "do_not_contact", "dnc"]
-SUPPRESSION_KEYWORDS = ["suppression", "blacklist", "do_not_call", "dnc_list", "opt_out_list", "blocked_numbers"]
-AUTOMATION_KEYWORDS = ["celery", "bull", "sidekiq", "cron", "batch_sms", "bulk_sms", "broadcast", "queue", "autodial"]
+from src.compliance.tcpa_mapping import get_tcpa_references_for_rule
+from src.compliance.communication_models import CommunicationFlowEvidence, CommunicationChannel
+from src.compliance.communication_classifier import classify_communications
 
 def evaluate_tcpa_applicability(
     repo_path: str,
-    flow_data: Optional[Dict[str, Any]] = None
+    flow_data: Optional[Dict[str, Any]] = None,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> Tuple[str, List[str], str]:
     """
     Evaluates TCPA applicability:
@@ -41,7 +29,7 @@ def evaluate_tcpa_applicability(
        - 'NOT_APPLICABLE' -> ('NOT_APPLICABLE', [...], 'ENVIRONMENT_OVERRIDE')
        - 'INDETERMINATE' -> ('INDETERMINATE', [...], 'ENVIRONMENT_OVERRIDE')
        - Any invalid string -> raises ValueError
-    2. Scans repo for technical evidence of telephony providers or phone PII:
+    2. Inspects shared CommunicationFlowEvidence for telephony providers / phone channels:
        - If found -> ('APPLICABLE', [...], 'TECHNICAL_EVIDENCE')
        - If not found -> ('INDETERMINATE', [...], 'HUMAN_REVIEW')
     """
@@ -57,47 +45,24 @@ def evaluate_tcpa_applicability(
         else:
             raise ValueError(f"Invalid TCPA_APPLICABILITY override value: '{env_override}'. Expected APPLICABLE, NOT_APPLICABLE, or INDETERMINATE.")
 
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, flow_data)
+
     reasons = []
     has_telephony = False
 
-    # Check shared flow data for telephony providers or phone PII
-    if flow_data:
-        transfers = flow_data.get("third_party_transfers", [])
-        for tr in transfers:
-            svc = str(tr.get("service", "")).lower()
-            if any(p in svc for p in TELEPHONY_PROVIDERS):
-                has_telephony = True
-                reasons.append(f"Telephony communications provider detected in third-party transfers: {tr.get('service')}")
-
-        inventory = flow_data.get("personal_data_inventory", [])
-        for item in inventory:
-            field = str(item.get("field_name", "")).lower()
-            if any(k in field for k in ["phone", "mobile", "telephone", "cell"]):
-                has_telephony = True
-                reasons.append(f"Phone number personal data field detected in inventory: {item.get('field_name')}")
-
-    # Codebase scan fallback
-    if not has_telephony and os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".php", ".json", ".env", ".yml", ".yaml")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read().lower()
-                            if any(p in content for p in TELEPHONY_PROVIDERS):
-                                has_telephony = True
-                                rel_p = os.path.relpath(filepath, repo_path)
-                                reasons.append(f"Telephony provider reference detected in {rel_p}")
-                                break
-                    except Exception:
-                        pass
-            if has_telephony:
-                break
+    for ev in comm_evidence:
+        if ev.channel in (CommunicationChannel.SMS.value, CommunicationChannel.VOICE_CALL.value) or ev.provider:
+            has_telephony = True
+            prov_str = f" to '{ev.provider}'" if ev.provider else ""
+            if ev.recipient_field:
+                reasons.append(f"Phone number personal data field detected in inventory: {ev.recipient_field}")
+            reasons.append(f"Telephony communications provider detected in third-party transfers{prov_str}")
 
     if has_telephony:
-        return ("APPLICABLE", reasons, "TECHNICAL_EVIDENCE")
+        # Deduplicate reasons while preserving order
+        unique_reasons = list(dict.fromkeys(reasons))
+        return ("APPLICABLE", unique_reasons, "TECHNICAL_EVIDENCE")
 
     return (
         "INDETERMINATE",
@@ -108,30 +73,28 @@ def evaluate_tcpa_applicability(
 
 def check_tcpa_communication_channels(
     repo_path: str,
-    flow_data: Optional[Dict[str, Any]] = None
+    flow_data: Optional[Dict[str, Any]] = None,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates telephone & SMS communication channels.
+    Evaluates telephone & SMS communication channels from shared CommunicationFlowEvidence.
     Note: Phone numbers and Twilio presence are technical evidence, NEVER automatic violations.
     """
     findings = []
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, flow_data)
+
     telephony_evidence = []
-
-    if flow_data:
-        inventory = flow_data.get("personal_data_inventory", [])
-        for item in inventory:
-            field = str(item.get("field_name", "")).lower()
-            if any(k in field for k in ["phone", "mobile", "telephone", "cell"]):
-                telephony_evidence.append(f"Phone PII field '{item.get('field_name')}' in {item.get('location', {}).get('file', 'codebase')}")
-
-        transfers = flow_data.get("third_party_transfers", [])
-        for tr in transfers:
-            svc = str(tr.get("service", "")).lower()
-            if any(p in svc for p in TELEPHONY_PROVIDERS):
-                telephony_evidence.append(f"Telephony service transfer to '{tr.get('service')}'")
+    for ev in comm_evidence:
+        if ev.channel in (CommunicationChannel.SMS.value, CommunicationChannel.VOICE_CALL.value):
+            if ev.recipient_field:
+                loc_file = ev.source_locations[0].get("file", "codebase") if ev.source_locations else "codebase"
+                telephony_evidence.append(f"Phone PII field '{ev.recipient_field}' in {loc_file}")
+            if ev.provider:
+                telephony_evidence.append(f"Telephony service transfer to '{ev.provider}'")
 
     if telephony_evidence:
-        ev_str = "; ".join(telephony_evidence[:5])
+        ev_str = "; ".join(dict.fromkeys(telephony_evidence))
         req = TCPA_REQUIREMENTS["TCPA-227-B-1-A-CALLS-CONSENT"]
         findings.append(Finding(
             category=Category.PRIVACY,
@@ -157,34 +120,22 @@ def check_tcpa_communication_channels(
 
 def check_tcpa_consent_evidence(
     repo_path: str,
-    flow_data: Optional[Dict[str, Any]] = None
+    flow_data: Optional[Dict[str, Any]] = None,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates consent UI / consent flags for telephone and SMS communications.
+    Evaluates consent UI / consent flags from shared CommunicationFlowEvidence.
     """
     findings = []
-    consent_found = False
-    consent_evidence = []
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, flow_data)
 
-    if os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".vue")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read()
-                            content_lower = content.lower()
-                            if any(k in content_lower for k in ["sms_consent", "phone_consent", "consent_to_text", "tcpa_consent", "agree_sms", "opt_in_sms"]):
-                                consent_found = True
-                                rel_p = os.path.relpath(filepath, repo_path)
-                                consent_evidence.append(f"Consent mechanism reference in {rel_p}")
-                    except Exception:
-                        pass
+    consent_items = []
+    for ev in comm_evidence:
+        consent_items.extend(ev.consent_evidence)
 
     req = TCPA_REQUIREMENTS["TCPA-227-B-1-A-CALLS-CONSENT"]
-    if consent_found:
+    if consent_items:
         findings.append(Finding(
             category=Category.PRIVACY,
             severity=Severity.INFO,
@@ -200,7 +151,7 @@ def check_tcpa_consent_evidence(
             tcpa_references=["TCPA-227-B-1-A-CALLS-CONSENT"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req["requirement"],
-            detected_evidence="; ".join(consent_evidence[:5]),
+            detected_evidence="; ".join(list(dict.fromkeys(consent_items))[:5]),
             recommended_action="Maintain documented audit trail of consent timestamps and opt-in text disclosures presented to users.",
             human_review_required="Verify that written consent language clearly states consent to receive marketing calls/SMS via autodialer if applicable."
         ))
@@ -228,35 +179,22 @@ def check_tcpa_consent_evidence(
     return findings
 
 def check_tcpa_opt_out_stop(
-    repo_path: str
+    repo_path: str,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates SMS opt-out mechanism (STOP, UNSUBSCRIBE, CANCEL, QUIT, HELP).
+    Evaluates SMS opt-out mechanism from shared CommunicationFlowEvidence.
     """
     findings = []
-    opt_out_found = False
-    opt_out_evidence = []
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, None)
 
-    if os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".php")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read()
-                            content_lower = content.lower()
-                            if any(k in content_lower for k in ["stop", "unsubscribe", "optout", "opt_out"]):
-                                if any(kw in content_lower for kw in ["sms", "twilio", "webhook", "message", "incoming"]):
-                                    opt_out_found = True
-                                    rel_p = os.path.relpath(filepath, repo_path)
-                                    opt_out_evidence.append(f"SMS opt-out handler in {rel_p}")
-                    except Exception:
-                        pass
+    opt_out_items = []
+    for ev in comm_evidence:
+        opt_out_items.extend(ev.opt_out_evidence)
 
     req = TCPA_REQUIREMENTS["TCPA-64-1200-SMS-OPT-OUT"]
-    if opt_out_found:
+    if opt_out_items:
         findings.append(Finding(
             category=Category.PRIVACY,
             severity=Severity.INFO,
@@ -272,7 +210,7 @@ def check_tcpa_opt_out_stop(
             tcpa_references=["TCPA-64-1200-SMS-OPT-OUT"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req["requirement"],
-            detected_evidence="; ".join(opt_out_evidence[:5]),
+            detected_evidence="; ".join(list(dict.fromkeys(opt_out_items))[:5]),
             recommended_action="Ensure opt-out processing immediately updates internal suppression lists and halts further outgoing messages to the subscriber.",
             human_review_required="Confirm that STOP, UNSUBSCRIBE, CANCEL, QUIT, and HELP replies are automatically processed and confirmed."
         ))
@@ -300,35 +238,24 @@ def check_tcpa_opt_out_stop(
     return findings
 
 def check_tcpa_suppression(
-    repo_path: str
+    repo_path: str,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates internal suppression list / do-not-contact / DNC database tables or services.
+    Evaluates internal suppression list from shared CommunicationFlowEvidence.
     """
     findings = []
-    suppression_found = False
-    suppression_evidence = []
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, None)
 
-    if os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".sql", ".prisma")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read().lower()
-                            if any(k in content for k in SUPPRESSION_KEYWORDS):
-                                suppression_found = True
-                                rel_p = os.path.relpath(filepath, repo_path)
-                                suppression_evidence.append(f"Suppression list reference in {rel_p}")
-                    except Exception:
-                        pass
+    supp_items = []
+    for ev in comm_evidence:
+        supp_items.extend(ev.suppression_evidence)
 
     req_dnc = TCPA_REQUIREMENTS["TCPA-227-C-DO-NOT-CALL"]
     req_supp = TCPA_REQUIREMENTS["TCPA-SUPPRESSION-LIST"]
 
-    if suppression_found:
+    if supp_items:
         findings.append(Finding(
             category=Category.PRIVACY,
             severity=Severity.INFO,
@@ -344,7 +271,7 @@ def check_tcpa_suppression(
             tcpa_references=["TCPA-227-C-DO-NOT-CALL", "TCPA-SUPPRESSION-LIST"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req_supp["requirement"],
-            detected_evidence="; ".join(suppression_evidence[:5]),
+            detected_evidence="; ".join(list(dict.fromkeys(supp_items))[:5]),
             recommended_action="Ensure suppression list is consulted in real time prior to executing outbound communication dispatch.",
             human_review_required="Verify compliance with internal DNC recordkeeping requirements under 47 C.F.R. § 64.1200(d)."
         ))
@@ -372,35 +299,24 @@ def check_tcpa_suppression(
     return findings
 
 def check_tcpa_automation_autodialer(
-    repo_path: str
+    repo_path: str,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates automated dispatch / autodialer / queue dispatch indicators.
-    Note: Automated/bulk messaging is technical evidence of automation, NOT automatic proof of an illegal autodialer under statutory definitions.
+    Evaluates automated dispatch / autodialer indicators from shared CommunicationFlowEvidence.
     """
     findings = []
-    auto_found = False
-    auto_evidence = []
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, None)
 
-    if os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".php", ".yml", ".yaml")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read().lower()
-                            if any(p in content for p in TELEPHONY_PROVIDERS) or "sms" in content or "phone" in content:
-                                if any(k in content for k in AUTOMATION_KEYWORDS):
-                                    auto_found = True
-                                    rel_p = os.path.relpath(filepath, repo_path)
-                                    auto_evidence.append(f"Automated queue/cron dispatch in {rel_p}")
-                    except Exception:
-                        pass
+    auto_evidence = []
+    for ev in comm_evidence:
+        if ev.automated or ev.bulk:
+            loc = ev.source_locations[0].get("file", "codebase") if ev.source_locations else "codebase"
+            auto_evidence.append(f"Automated queue/cron dispatch in {loc}")
 
     req = TCPA_REQUIREMENTS["TCPA-AUTODIALER-ATDS-MONITOR"]
-    if auto_found:
+    if auto_evidence:
         findings.append(Finding(
             category=Category.PRIVACY,
             severity=Severity.INFO,
@@ -416,7 +332,7 @@ def check_tcpa_automation_autodialer(
             tcpa_references=["TCPA-AUTODIALER-ATDS-MONITOR"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req["requirement"],
-            detected_evidence="; ".join(auto_evidence[:5]),
+            detected_evidence="; ".join(list(dict.fromkeys(auto_evidence))[:5]),
             recommended_action="Ensure all automated telephone/SMS dispatch pipelines enforce consent verification and suppression list filtering before API invocation.",
             human_review_required="Review whether automated dispatch equipment satisfies ATDS criteria under Facebook v. Duguid (141 S. Ct. 1163) and applicable FCC rulings."
         ))
@@ -425,32 +341,23 @@ def check_tcpa_automation_autodialer(
 
 def check_tcpa_voice_calling(
     repo_path: str,
-    flow_data: Optional[Dict[str, Any]] = None
+    flow_data: Optional[Dict[str, Any]] = None,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> List[Finding]:
     """
-    Evaluates voice calling and artificial / prerecorded voice controls.
+    Evaluates voice calling controls from shared CommunicationFlowEvidence.
     """
     findings = []
-    voice_found = False
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, flow_data)
+
     voice_evidence = []
+    for ev in comm_evidence:
+        if ev.channel == CommunicationChannel.VOICE_CALL.value:
+            loc = ev.source_locations[0].get("file", "codebase") if ev.source_locations else "codebase"
+            voice_evidence.append(f"Voice call / TwiML evidence in {loc}")
 
-    if os.path.exists(repo_path):
-        for root, dirs, files in os.walk(repo_path):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            for file in files:
-                if file.endswith((".py", ".js", ".ts", ".jsx", ".tsx", ".xml", ".twiml")):
-                    filepath = os.path.join(root, file)
-                    try:
-                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read().lower()
-                            if any(k in content for k in VOICE_SPECIFIC_KEYWORDS) or "<say>" in content or "<play>" in content:
-                                voice_found = True
-                                rel_p = os.path.relpath(filepath, repo_path)
-                                voice_evidence.append(f"Voice call / TwiML evidence in {rel_p}")
-                    except Exception:
-                        pass
-
-    if voice_found:
+    if voice_evidence:
         req = TCPA_REQUIREMENTS["TCPA-227-B-1-B-PRERECORDED-VOICE"]
         findings.append(Finding(
             category=Category.PRIVACY,
@@ -467,7 +374,7 @@ def check_tcpa_voice_calling(
             tcpa_references=["TCPA-227-B-1-B-PRERECORDED-VOICE", "TCPA-64-1200-IDENTIFICATION"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req["requirement"],
-            detected_evidence="; ".join(voice_evidence[:5]),
+            detected_evidence="; ".join(list(dict.fromkeys(voice_evidence))[:5]),
             recommended_action="Ensure voice scripts include mandatory caller identification disclosures at the beginning of each call.",
             human_review_required="Verify prior express consent for artificial or prerecorded voice communications under 47 C.F.R. § 64.1200(a)(3)."
         ))
@@ -527,13 +434,17 @@ def generate_tcpa_attestations(applicability_state: str) -> List[Finding]:
 def run_tcpa_checks(
     repo_path: str,
     flow_data: Optional[Dict[str, Any]] = None,
-    shared_findings: Optional[List[Finding]] = None
+    shared_findings: Optional[List[Finding]] = None,
+    comm_evidence: Optional[List[CommunicationFlowEvidence]] = None
 ) -> Tuple[Dict[str, Any], List[Finding]]:
     """
     Main entry point for running TCPA compliance checks.
-    Integrates technical checks, attestation generation, and shared finding re-tagging.
+    Consumes framework-neutral CommunicationFlowEvidence from shared classifier.
     """
-    state, reasons, source = evaluate_tcpa_applicability(repo_path, flow_data)
+    if comm_evidence is None:
+        comm_evidence = classify_communications(repo_path, flow_data)
+
+    state, reasons, source = evaluate_tcpa_applicability(repo_path, flow_data, comm_evidence)
 
     if state == "NOT_APPLICABLE":
         summary = {
@@ -547,18 +458,18 @@ def run_tcpa_checks(
 
     tcpa_findings: List[Finding] = []
 
-    # Run technical checks
-    tcpa_findings.extend(check_tcpa_communication_channels(repo_path, flow_data))
-    tcpa_findings.extend(check_tcpa_consent_evidence(repo_path, flow_data))
-    tcpa_findings.extend(check_tcpa_opt_out_stop(repo_path))
-    tcpa_findings.extend(check_tcpa_suppression(repo_path))
-    tcpa_findings.extend(check_tcpa_automation_autodialer(repo_path))
-    tcpa_findings.extend(check_tcpa_voice_calling(repo_path, flow_data))
+    # Run technical checks consuming shared communication evidence
+    tcpa_findings.extend(check_tcpa_communication_channels(repo_path, flow_data, comm_evidence))
+    tcpa_findings.extend(check_tcpa_consent_evidence(repo_path, flow_data, comm_evidence))
+    tcpa_findings.extend(check_tcpa_opt_out_stop(repo_path, comm_evidence))
+    tcpa_findings.extend(check_tcpa_suppression(repo_path, comm_evidence))
+    tcpa_findings.extend(check_tcpa_automation_autodialer(repo_path, comm_evidence))
+    tcpa_findings.extend(check_tcpa_voice_calling(repo_path, flow_data, comm_evidence))
 
     # Add organizational attestations
     tcpa_findings.extend(generate_tcpa_attestations(state))
 
-    # Re-tag qualifying shared security findings (ToolStatus.COMPLETED only)
+    # Re-tag qualifying shared security findings (ToolStatus.COMPLETED or OPEN)
     if shared_findings:
         for f in shared_findings:
             if getattr(f, "status", None) == ToolStatus.COMPLETED.value or getattr(f, "status", None) == "OPEN":

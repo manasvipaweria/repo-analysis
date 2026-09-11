@@ -288,10 +288,18 @@ class Orchestrator:
             except Exception as e:
                 print(f"SPDI engine execution error: {e}")
 
+            # Shared Communication Channel Classifier
+            try:
+                from src.compliance.communication_classifier import classify_communications
+                comm_evidence = classify_communications(repo_path, flow_data)
+            except Exception as e:
+                print(f"Communication classifier execution error: {e}")
+                comm_evidence = None
+
             # US TCPA (Telephone Consumer Protection Act) Engine Checks
             try:
                 from src.compliance.tcpa_engine import run_tcpa_checks
-                tcpa_summary, tcpa_findings = run_tcpa_checks(repo_path, flow_data, deduped_findings)
+                tcpa_summary, tcpa_findings = run_tcpa_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
                 deduped_findings.extend(tcpa_findings)
             except Exception as e:
                 print(f"TCPA engine execution error: {e}")

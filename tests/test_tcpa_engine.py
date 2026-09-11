@@ -137,3 +137,43 @@ def test_run_tcpa_checks(tmp_path, monkeypatch):
     assert summary["applicability"] == "APPLICABLE"
     assert len(findings) > 0
     assert "TCPA-227-B-1-A-CALLS-CONSENT" in shared_finding.tcpa_references
+
+def test_tcpa_decoupling_consumes_shared_communication_evidence(tmp_path, monkeypatch):
+    from unittest.mock import patch
+    from src.compliance.communication_models import CommunicationFlowEvidence, CommunicationChannel
+
+    monkeypatch.setenv("TCPA_APPLICABILITY", "APPLICABLE")
+
+    custom_evidence = [
+        CommunicationFlowEvidence(
+            flow_id="test-flow-1",
+            channel=CommunicationChannel.SMS.value,
+            provider="twilio",
+            recipient_field="mobile_number",
+            consent_evidence=["Consent check in form.jsx"],
+            opt_out_evidence=["STOP handler in webhook.py"],
+            suppression_evidence=["Suppression model in db.py"],
+            automated=True,
+            bulk=True,
+            source_locations=[{"file": "sms.py", "line": 10}]
+        )
+    ]
+
+    with patch("src.compliance.tcpa_engine.classify_communications") as mock_classifier:
+        summary, findings = run_tcpa_checks(
+            repo_path=str(tmp_path),
+            flow_data={},
+            shared_findings=[],
+            comm_evidence=custom_evidence
+        )
+
+        # Assert classifier was NOT called because comm_evidence was explicitly supplied
+        mock_classifier.assert_not_called()
+
+        assert summary["status"] == ToolStatus.COMPLETED.value
+        assert len(findings) > 0
+        rule_ids = {f.rule_id for f in findings}
+        assert "TCPA-227-B-1-A-CALLS-CONSENT" in rule_ids
+        assert "TCPA-64-1200-SMS-OPT-OUT" in rule_ids
+        assert "TCPA-SUPPRESSION-LIST" in rule_ids
+        assert "TCPA-AUTODIALER-ATDS-MONITOR" in rule_ids
