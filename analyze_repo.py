@@ -171,6 +171,24 @@ def main():
             print(f"  - Organizational Attestations Required: {len(attestations)} checklist items")
             print("------------------------")
 
+        # CERT-In summary section
+        try:
+            from src.compliance.cert_in_engine import evaluate_cert_in_applicability
+            cert_app, cert_entity, cert_reason = evaluate_cert_in_applicability(repo_path)
+            cert_in_tagged = [f for f in report.findings if getattr(f, 'cert_in_references', None) and len(f.cert_in_references) > 0]
+            cert_in_dedicated = [f for f in report.findings if getattr(f, 'framework', None) == "CERT-IN"]
+            cert_attestations = [f for f in report.findings if getattr(f, 'framework', None) == "CERT-IN" and getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"India CERT-In Technical Readiness:")
+            print(f"  - Applicability State: {cert_app} (Scope: {cert_entity})")
+            print(f"  - Annexure I Incident Readiness Evidence: {len(cert_in_tagged)} tagged security findings")
+            print(f"  - General Statutory Requirements (Retention/NTP): {len(cert_in_dedicated) - len(cert_attestations)} evidence items")
+            print(f"  - Organizational Attestations Required: {len(cert_attestations)} checklist items")
+            print("------------------------")
+        except Exception as e:
+            print(f"India CERT-In Technical Readiness: Configuration Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

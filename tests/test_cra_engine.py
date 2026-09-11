@@ -114,3 +114,20 @@ def test_no_duplicate_technical_findings(tmp_path):
     # Total findings count should equal unique findings list length
     finding_ids = [f.finding_id for f in report.findings]
     assert len(finding_ids) == len(set(finding_ids))
+
+def test_multi_framework_coexistence(tmp_path):
+    (tmp_path / "SECURITY.md").write_text("Security Policy\nContact: security@example.com")
+    
+    orc = Orchestrator([])
+    report = orc.analyze("local", str(tmp_path))
+
+    # 1. SECURITY.md finding should carry both CRA and CERT-In references
+    sec_md = next((f for f in report.findings if f.rule_id == "cra-security-md-disclosure"), None)
+    assert sec_md is not None
+    assert "CRA-II-6" in (sec_md.cra_references or [])
+    assert "CERT-IN-POC" in (sec_md.cert_in_references or [])
+
+    # 2. Dedicated CERT-In findings are present as separate objects
+    cert_dedicated = [f for f in report.findings if getattr(f, 'framework', None) == "CERT-IN"]
+    assert len(cert_dedicated) >= 4
+

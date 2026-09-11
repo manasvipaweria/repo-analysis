@@ -272,6 +272,14 @@ class Orchestrator:
             except Exception as e:
                 print(f"CRA engine execution error: {e}")
 
+            # India CERT-In Directions Engine Checks
+            try:
+                from src.compliance.cert_in_engine import run_cert_in_checks
+                cert_in_findings = run_cert_in_checks(repo_path, deduped_findings)
+                deduped_findings.extend(cert_in_findings)
+            except Exception as e:
+                print(f"CERT-In engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
