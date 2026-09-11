@@ -201,3 +201,16 @@ def classify_communications(
                         pass
 
     return list(flow_map.values())
+
+
+class CommunicationChannelClassifier:
+    """
+    Class wrapper for repository communication classification.
+    """
+    def classify_repository_communications(
+        self,
+        repo_path: str,
+        flow_data: Optional[Dict[str, Any]] = None
+    ) -> List[CommunicationFlowEvidence]:
+        return classify_communications(repo_path, flow_data)
+

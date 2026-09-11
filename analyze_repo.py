@@ -243,6 +243,30 @@ def main():
             print(f"US TCPA Technical Readiness: Execution Error ({e})")
             print("------------------------")
 
+        # TRAI / DLT summary section
+        try:
+            from src.compliance.trai_dlt_engine import evaluate_trai_dlt_applicability
+            trai_eval = evaluate_trai_dlt_applicability(repo_path, report.data_flow)
+            trai_findings = [f for f in report.findings if getattr(f, 'framework', None) == "TRAI_DLT" or (getattr(f, 'trai_dlt_references', None) and len(f.trai_dlt_references) > 0)]
+            
+            pe_items = [f for f in trai_findings if any("REG-PE-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            hdr_items = [f for f in trai_findings if any("REG-HEADER-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            tpl_items = [f for f in trai_findings if any("REG-TEMPLATE-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            promo_items = [f for f in trai_findings if any("PROMOTIONAL" in r or "PREFERENCE-DND" in r for r in getattr(f, 'trai_dlt_references', []))]
+            trai_attestations = [f for f in trai_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"India TRAI / TCCCPR / DLT Technical Readiness:")
+            print(f"  - Applicability State: {trai_eval['status']} ({trai_eval['evaluation_method']})")
+            print(f"  - Principal Entity (PE) ID Evidence: {len(pe_items)}")
+            print(f"  - Sender Header ID Evidence: {len(hdr_items)}")
+            print(f"  - Content Template ID Evidence: {len(tpl_items)}")
+            print(f"  - Promotional Controls / DND Evidence: {len(promo_items)}")
+            print(f"  - Organizational Attestations Required: {len(trai_attestations)} checklist items")
+            print("------------------------")
+        except Exception as e:
+            print(f"India TRAI / TCCCPR / DLT Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

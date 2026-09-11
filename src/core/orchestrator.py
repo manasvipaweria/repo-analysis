@@ -304,6 +304,13 @@ class Orchestrator:
             except Exception as e:
                 print(f"TCPA engine execution error: {e}")
 
+            try:
+                from src.compliance.trai_dlt_engine import run_trai_dlt_checks
+                trai_dlt_findings = run_trai_dlt_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
+                deduped_findings.extend(trai_dlt_findings)
+            except Exception as e:
+                print(f"TRAI/DLT engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
@@ -461,6 +468,14 @@ class Orchestrator:
                 existing_tcpa = set(f.tcpa_references or [])
                 existing_tcpa.update(tcpa_refs)
                 f.tcpa_references = sorted(list(existing_tcpa))
+
+            # TRAI / DLT Mapping
+            from src.compliance.trai_dlt_mapping import get_trai_dlt_references_for_rule
+            trai_refs = get_trai_dlt_references_for_rule(f.rule_id, f.detected_by)
+            if trai_refs:
+                existing_trai = set(f.trai_dlt_references or [])
+                existing_trai.update(trai_refs)
+                f.trai_dlt_references = sorted(list(existing_trai))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec
