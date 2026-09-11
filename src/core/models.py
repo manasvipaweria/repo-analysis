@@ -98,6 +98,8 @@ class Finding:
     cra_references: Optional[List[str]] = None
     # CERT-In specific fields
     cert_in_references: Optional[List[str]] = None
+    # SPDI specific fields
+    spdi_references: Optional[List[str]] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -120,6 +122,7 @@ class Finding:
         evidence_status: Optional[str] = None,
         cra_references: Optional[List[str]] = None,
         cert_in_references: Optional[List[str]] = None,
+        spdi_references: Optional[List[str]] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -160,6 +163,7 @@ class Finding:
         self.evidence_status = evidence_status
         self.cra_references = cra_references or []
         self.cert_in_references = cert_in_references or []
+        self.spdi_references = spdi_references or []
 
 @dataclass
 class TestMetrics:
@@ -257,6 +261,7 @@ class Report:
                 evidence_status=fd.get("evidence_status"),
                 cra_references=fd.get("cra_references", []),
                 cert_in_references=fd.get("cert_in_references", []),
+                spdi_references=fd.get("spdi_references", []),
                 file=None,  # Legacy args
                 line=None,
                 message=""

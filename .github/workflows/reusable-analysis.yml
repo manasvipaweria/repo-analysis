@@ -101,10 +101,12 @@ jobs:
             echo "Installing frontend dependencies in target-repo/frontend..."
             cd target-repo/frontend
             NODE_ENV=development npm install --include=dev --no-fund --no-audit
+            NODE_ENV=development npm install @deslint/eslint-plugin eslint --save-dev --no-fund --no-audit
           elif [ -f "target-repo/package.json" ]; then
             echo "Installing dependencies in target-repo root..."
             cd target-repo
             NODE_ENV=development npm install --include=dev --no-fund --no-audit
+            NODE_ENV=development npm install @deslint/eslint-plugin eslint --save-dev --no-fund --no-audit
           fi
 
       - name: Verify Deslint dependency resolution

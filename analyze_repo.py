@@ -189,6 +189,36 @@ def main():
             print(f"India CERT-In Technical Readiness: Configuration Error ({e})")
             print("------------------------")
 
+        # SPDI summary section
+        try:
+            from src.compliance.spdi_engine import evaluate_spdi_applicability
+            spdi_app, spdi_reason = evaluate_spdi_applicability(repo_path)
+            spdi_findings = [f for f in report.findings if getattr(f, 'framework', None) == "SPDI" or (getattr(f, 'spdi_references', None) and len(f.spdi_references) > 0)]
+            
+            sensitive_fields = [f for f in spdi_findings if f.rule_id == "spdi-rule3-sensitive-data-detected"]
+            ordinary_pii = [f for f in spdi_findings if f.rule_id == "spdi-rule3-ordinary-pii-detected"]
+            consent_items = [f for f in spdi_findings if any(r.startswith("SPDI-RULE-5-1") for r in getattr(f, 'spdi_references', []))]
+            policy_items = [f for f in spdi_findings if any(r.startswith("SPDI-RULE-4") for r in getattr(f, 'spdi_references', []))]
+            security_items = [f for f in spdi_findings if any(r.startswith("SPDI-RULE-8") for r in getattr(f, 'spdi_references', []))]
+            third_party_items = [f for f in spdi_findings if any(r.startswith("SPDI-RULE-6") for r in getattr(f, 'spdi_references', []))]
+            cross_border_items = [f for f in spdi_findings if any(r.startswith("SPDI-RULE-7-CROSS-BORDER") for r in getattr(f, 'spdi_references', []))]
+            attestations = [f for f in spdi_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"India IT SPDI Rules Technical Readiness:")
+            print(f"  - Applicability State: {spdi_app}")
+            print(f"  - SPDI-Sensitive Data Fields Detected: {len(sensitive_fields)}")
+            print(f"  - Ordinary PII Fields Detected: {len(ordinary_pii)}")
+            print(f"  - Consent Evidence Items: {len(consent_items)}")
+            print(f"  - Privacy Policy Evidence: {len(policy_items)}")
+            print(f"  - Reasonable Security Evidence: {len(security_items)}")
+            print(f"  - Third-Party Disclosure Evidence: {len(third_party_items)}")
+            print(f"  - Cross-Border Transfer Evidence: {len(cross_border_items)}")
+            print(f"  - Organizational Attestations Required: {len(attestations)} checklist items")
+            print("------------------------")
+        except Exception as e:
+            print(f"India IT SPDI Rules Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

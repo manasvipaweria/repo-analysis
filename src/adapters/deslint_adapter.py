@@ -208,6 +208,19 @@ export default [
 
             plugin_pkg_path = os.path.join(react_dir, "node_modules", "@deslint", "eslint-plugin")
             parent_plugin_pkg_path = os.path.join(repo_path, "node_modules", "@deslint", "eslint-plugin")
+            
+            if not os.path.exists(plugin_pkg_path) and not os.path.exists(parent_plugin_pkg_path):
+                subprocess.run(
+                    "npm install @deslint/eslint-plugin eslint --save-dev --no-fund --no-audit",
+                    cwd=react_dir,
+                    env=env,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace"
+                )
+
             if not os.path.exists(plugin_pkg_path) and not os.path.exists(parent_plugin_pkg_path):
                 return ToolResult(
                     tool=self.tool_name,

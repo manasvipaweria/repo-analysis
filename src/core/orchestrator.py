@@ -280,6 +280,14 @@ class Orchestrator:
             except Exception as e:
                 print(f"CERT-In engine execution error: {e}")
 
+            # India IT SPDI Rules 2011 Engine Checks
+            try:
+                from src.compliance.spdi_engine import run_spdi_checks
+                spdi_findings = run_spdi_checks(repo_path, flow_data, deduped_findings)
+                deduped_findings.extend(spdi_findings)
+            except Exception as e:
+                print(f"SPDI engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
@@ -421,6 +429,14 @@ class Orchestrator:
                 existing_cra = set(f.cra_references or [])
                 existing_cra.update(cra_refs)
                 f.cra_references = sorted(list(existing_cra))
+
+            # SPDI Mapping
+            from src.compliance.spdi_mapping import get_spdi_references_for_rule
+            spdi_refs = get_spdi_references_for_rule(f.rule_id, f.detected_by, f.severity)
+            if spdi_refs:
+                existing_spdi = set(f.spdi_references or [])
+                existing_spdi.update(spdi_refs)
+                f.spdi_references = sorted(list(existing_spdi))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec
