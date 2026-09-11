@@ -219,6 +219,30 @@ def main():
             print(f"India IT SPDI Rules Technical Readiness: Execution Error ({e})")
             print("------------------------")
 
+        # TCPA summary section
+        try:
+            from src.compliance.tcpa_engine import evaluate_tcpa_applicability
+            tcpa_app, tcpa_reasons, tcpa_src = evaluate_tcpa_applicability(repo_path, report.data_flow)
+            tcpa_findings = [f for f in report.findings if getattr(f, 'framework', None) == "TCPA" or (getattr(f, 'tcpa_references', None) and len(f.tcpa_references) > 0)]
+            
+            opt_out_items = [f for f in tcpa_findings if any("OPT-OUT" in r for r in getattr(f, 'tcpa_references', []))]
+            consent_items = [f for f in tcpa_findings if any("CONSENT" in r for r in getattr(f, 'tcpa_references', []))]
+            suppression_items = [f for f in tcpa_findings if any("SUPPRESSION" in r or "DO-NOT-CALL" in r for r in getattr(f, 'tcpa_references', []))]
+            autodialer_items = [f for f in tcpa_findings if any("AUTODIALER" in r for r in getattr(f, 'tcpa_references', []))]
+            tcpa_attestations = [f for f in tcpa_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"US TCPA Technical Readiness:")
+            print(f"  - Applicability State: {tcpa_app} ({tcpa_src})")
+            print(f"  - Express Consent Evidence: {len(consent_items)}")
+            print(f"  - SMS Opt-Out (STOP) Evidence: {len(opt_out_items)}")
+            print(f"  - Suppression / DNC Evidence: {len(suppression_items)}")
+            print(f"  - Autodialer / Automation Evidence: {len(autodialer_items)}")
+            print(f"  - Organizational Attestations Required: {len(tcpa_attestations)} checklist items")
+            print("------------------------")
+        except Exception as e:
+            print(f"US TCPA Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

@@ -288,6 +288,14 @@ class Orchestrator:
             except Exception as e:
                 print(f"SPDI engine execution error: {e}")
 
+            # US TCPA (Telephone Consumer Protection Act) Engine Checks
+            try:
+                from src.compliance.tcpa_engine import run_tcpa_checks
+                tcpa_summary, tcpa_findings = run_tcpa_checks(repo_path, flow_data, deduped_findings)
+                deduped_findings.extend(tcpa_findings)
+            except Exception as e:
+                print(f"TCPA engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
@@ -437,6 +445,14 @@ class Orchestrator:
                 existing_spdi = set(f.spdi_references or [])
                 existing_spdi.update(spdi_refs)
                 f.spdi_references = sorted(list(existing_spdi))
+
+            # TCPA Mapping
+            from src.compliance.tcpa_mapping import get_tcpa_references_for_rule
+            tcpa_refs = get_tcpa_references_for_rule(f.rule_id, f.detected_by, f.severity)
+            if tcpa_refs:
+                existing_tcpa = set(f.tcpa_references or [])
+                existing_tcpa.update(tcpa_refs)
+                f.tcpa_references = sorted(list(existing_tcpa))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec
