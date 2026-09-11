@@ -123,6 +123,18 @@ jobs:
             node -e "import('file://' + process.cwd() + '/node_modules/@deslint/eslint-plugin/dist/index.js').then(() => console.log('ESM resolution of @deslint/eslint-plugin succeeded.')).catch(e => console.error('ESM resolution error:', e.message))" || true
           fi
 
+      - name: Debug Deslint package and npmrc
+        run: |
+          if [ -d "target-repo/frontend" ]; then
+            cd target-repo
+            ls frontend/node_modules/@deslint/ 2>&1 || echo "not found"
+            cat frontend/.npmrc 2>&1 || echo "no npmrc"
+          elif [ -d "target-repo" ]; then
+            cd target-repo
+            ls node_modules/@deslint/ 2>&1 || echo "not found"
+            cat .npmrc 2>&1 || echo "no npmrc"
+          fi
+
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:
