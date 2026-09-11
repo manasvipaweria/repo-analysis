@@ -291,5 +291,41 @@ def test_deslint_react_dir_detection_skips_node_modules(tmp_path):
 
             assert result.status in (ToolStatus.ERROR, ToolStatus.SKIPPED)
 
+def test_deslint_nested_frontend_path_no_duplication(tmp_path):
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir(parents=True)
+    (frontend_dir / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    
+    local_eslint = frontend_dir / "node_modules" / "eslint" / "bin" / "eslint.js"
+    local_eslint.parent.mkdir(parents=True)
+    local_eslint.write_text("// eslint.js")
+    
+    plugin_dir = frontend_dir / "node_modules" / "@deslint" / "eslint-plugin"
+    plugin_dir.mkdir(parents=True)
+    
+    adapter = DeslintAdapter()
+    with patch('subprocess.run') as mock_run:
+        with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
+            mock_proc = MagicMock()
+            mock_proc.returncode = 0
+            mock_proc.stdout = "[]"
+            mock_run.side_effect = [mock_install, mock_proc]
+            
+            result = adapter.run(str(tmp_path))
+            assert result.status == ToolStatus.COMPLETED
+            
+            assert mock_run.call_count == 2
+            eslint_call = mock_run.call_args_list[1]
+            cmd = eslint_call[0][0]
+            cwd = eslint_call.kwargs.get("cwd") or eslint_call[1].get("cwd")
+            
+            assert cwd == str(frontend_dir.resolve())
+            assert "frontend/frontend" not in cmd.replace("\\", "/")
+            assert "frontend\\frontend" not in cmd
+            assert str(local_eslint.resolve()) in cmd
+
 
 

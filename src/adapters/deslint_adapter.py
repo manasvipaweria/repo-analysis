@@ -163,22 +163,26 @@ export default [
   }
 ];
 """
-        react_dir = repo_path
-        for root_dir, dirs, files in os.walk(repo_path):
+        from pathlib import Path
+
+        repo_dir = Path(repo_path).resolve()
+        frontend_dir = repo_dir
+
+        for root_dir, dirs, files in os.walk(repo_dir):
             if 'node_modules' in dirs:
                 dirs.remove('node_modules')
             if 'package.json' in files:
                 try:
-                    with open(os.path.join(root_dir, 'package.json'), 'r', encoding='utf-8') as f:
+                    with open(Path(root_dir) / 'package.json', 'r', encoding='utf-8') as f:
                         data = json.load(f)
                         deps = {**data.get('dependencies', {}), **data.get('devDependencies', {})}
                         if 'react' in deps or 'react-dom' in deps:
-                            react_dir = root_dir
+                            frontend_dir = Path(root_dir).resolve()
                             break
                 except Exception:
                     pass
 
-        config_path = os.path.join(react_dir, ".deslint.config.mjs")
+        config_path = frontend_dir / ".deslint.config.mjs"
         
         env = os.environ.copy()
         env["NODE_ENV"] = "development"
@@ -189,7 +193,7 @@ export default [
                 
             install_res = subprocess.run(
                 "npm install --include=dev --no-fund --no-audit",
-                cwd=react_dir,
+                cwd=str(frontend_dir),
                 env=env,
                 shell=True,
                 capture_output=True,
@@ -203,16 +207,16 @@ export default [
                     tool=self.tool_name,
                     status=ToolStatus.ERROR,
                     findings=[],
-                    error_message=f"npm install failed in {react_dir} with exit code {install_res.returncode}: {err_msg[:500]}"
+                    error_message=f"npm install failed in {frontend_dir} with exit code {install_res.returncode}: {err_msg[:500]}"
                 )
 
-            plugin_pkg_path = os.path.join(react_dir, "node_modules", "@deslint", "eslint-plugin")
-            parent_plugin_pkg_path = os.path.join(repo_path, "node_modules", "@deslint", "eslint-plugin")
+            plugin_pkg_path = frontend_dir / "node_modules" / "@deslint" / "eslint-plugin"
+            parent_plugin_pkg_path = repo_dir / "node_modules" / "@deslint" / "eslint-plugin"
             
-            if not os.path.exists(plugin_pkg_path) and not os.path.exists(parent_plugin_pkg_path):
+            if not plugin_pkg_path.exists() and not parent_plugin_pkg_path.exists():
                 subprocess.run(
                     "npm install @deslint/eslint-plugin eslint --save-dev --no-fund --no-audit",
-                    cwd=react_dir,
+                    cwd=str(frontend_dir),
                     env=env,
                     shell=True,
                     capture_output=True,
@@ -221,26 +225,32 @@ export default [
                     errors="replace"
                 )
 
-            if not os.path.exists(plugin_pkg_path) and not os.path.exists(parent_plugin_pkg_path):
+            if not plugin_pkg_path.exists() and not parent_plugin_pkg_path.exists():
                 return ToolResult(
                     tool=self.tool_name,
                     status=ToolStatus.ERROR,
                     findings=[],
-                    error_message=f"Cannot find package '@deslint/eslint-plugin' in {react_dir} or {repo_path}. Dependency installation failed or package missing."
+                    error_message=f"Cannot find package '@deslint/eslint-plugin' in {frontend_dir} or {repo_dir}. Dependency installation failed or package missing."
                 )
 
-            local_eslint_bin = os.path.join(react_dir, "node_modules", "eslint", "bin", "eslint.js")
-            parent_eslint_bin = os.path.join(repo_path, "node_modules", "eslint", "bin", "eslint.js")
-            if os.path.exists(local_eslint_bin):
-                cmd = f'node "{local_eslint_bin}" -c .deslint.config.mjs . -f json'
-            elif os.path.exists(parent_eslint_bin):
-                cmd = f'node "{parent_eslint_bin}" -c .deslint.config.mjs . -f json'
+            local_eslint_bin = frontend_dir / "node_modules" / "eslint" / "bin" / "eslint.js"
+            parent_eslint_bin = repo_dir / "node_modules" / "eslint" / "bin" / "eslint.js"
+
+            if local_eslint_bin.exists():
+                eslint_exec = str(local_eslint_bin.resolve())
+            elif parent_eslint_bin.exists():
+                eslint_exec = str(parent_eslint_bin.resolve())
+            else:
+                eslint_exec = None
+
+            if eslint_exec:
+                cmd = f'node "{eslint_exec}" -c .deslint.config.mjs . -f json'
             else:
                 cmd = "npx --no-install eslint -c .deslint.config.mjs . -f json"
 
             result = subprocess.run(
                 cmd,
-                cwd=react_dir,
+                cwd=str(frontend_dir),
                 env=env,
                 capture_output=True,
                 shell=True,
@@ -275,8 +285,12 @@ export default [
             for file_result in output_data:
                 file_path = file_result.get("filePath", "")
                 abs_file_path = file_path  # keep full path for classifier
-                if file_path.startswith(repo_path):
-                    file_path = os.path.relpath(file_path, repo_path).replace("\\", "/")
+                try:
+                    rel_p = Path(file_path).relative_to(repo_dir)
+                    file_path = rel_p.as_posix()
+                except ValueError:
+                    if file_path.startswith(str(repo_dir)):
+                        file_path = os.path.relpath(file_path, str(repo_dir)).replace("\\", "/")
                     
                 for msg in file_result.get("messages", []):
                     rule_id = msg.get("ruleId") or ""
