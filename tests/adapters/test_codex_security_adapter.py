@@ -18,7 +18,7 @@ def test_codex_security_adapter_no_key():
         assert len(result.findings) == 0
 
 @patch("src.adapters.codex_security_adapter.subprocess.run")
-def test_codex_security_adapter_success(mock_run, mock_env):
+def test_codex_security_adapter_success_findings(mock_run, mock_env):
     adapter = CodexSecurityAdapter()
     
     mock_result = MagicMock()
@@ -63,6 +63,76 @@ def test_codex_security_adapter_success(mock_run, mock_env):
     assert f.rule_id == "CWE-89"
     assert "codex-security" in f.detected_by
 
+    # Verify environment variables passed
+    _, kwargs = mock_run.call_args
+    passed_env = kwargs.get("env", {})
+    assert "CODEX_HOME" in passed_env
+    assert passed_env.get("CODEX_PERMISSION_PROFILE") == ":workspace"
+
+@patch("src.adapters.codex_security_adapter.subprocess.run")
+def test_codex_security_adapter_success_zero_findings(mock_run, mock_env):
+    adapter = CodexSecurityAdapter()
+    
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = '{"repositoryFindings": []}'
+    mock_run.return_value = mock_result
+    
+    res = adapter.run(".")
+    assert res.status.name == "COMPLETED"
+    assert len(res.findings) == 0
+    assert res.error_message is None
+
+@patch("src.adapters.codex_security_adapter.subprocess.run")
+def test_codex_security_adapter_cli_error_code_2(mock_run, mock_env):
+    adapter = CodexSecurityAdapter()
+    
+    mock_result = MagicMock()
+    mock_result.returncode = 2
+    mock_result.stderr = "Error: state directory /home/runner/.codex/state/plugins/codex-security/scans could not be accessed"
+    mock_result.stdout = ""
+    mock_run.return_value = mock_result
+    
+    res = adapter.run(".")
+    assert res.status.name == "ERROR"
+    assert len(res.findings) == 0
+    assert "CLI failed with code 2" in res.error_message
+
+@patch("src.adapters.codex_security_adapter.subprocess.run")
+def test_codex_security_adapter_partial_output_on_error(mock_run, mock_env):
+    adapter = CodexSecurityAdapter()
+    
+    mock_result = MagicMock()
+    mock_result.returncode = 2
+    mock_result.stderr = "Error during execution after partial scan"
+    mock_result.stdout = '{"repositoryFindings": [{"title": "Partial"}]}'
+    mock_run.return_value = mock_result
+    
+    res = adapter.run(".")
+    assert res.status.name == "ERROR"
+    assert len(res.findings) == 0
+    assert "CLI failed with code 2" in res.error_message
+
+@patch("src.adapters.codex_security_adapter.os.makedirs")
+def test_codex_security_adapter_non_writable_dir(mock_makedirs, mock_env):
+    mock_makedirs.side_effect = PermissionError("Permission denied")
+    adapter = CodexSecurityAdapter()
+    
+    res = adapter.run(".")
+    assert res.status.name == "ERROR"
+    assert len(res.findings) == 0
+    assert "is not writable" in res.error_message
+
+@patch("src.adapters.codex_security_adapter.subprocess.run")
+def test_codex_security_adapter_shell_execution_error(mock_run, mock_env):
+    adapter = CodexSecurityAdapter()
+    mock_run.side_effect = FileNotFoundError("npx command not found")
+    
+    res = adapter.run(".")
+    assert res.status.name == "ERROR"
+    assert len(res.findings) == 0
+    assert "Unexpected error" in res.error_message or "npx command not found" in res.error_message
+
 @patch("src.adapters.codex_security_adapter.subprocess.run")
 def test_codex_security_adapter_auth_failure(mock_run, mock_env):
     adapter = CodexSecurityAdapter()
@@ -85,3 +155,4 @@ def test_codex_security_adapter_timeout(mock_run, mock_env):
     res = adapter.run(".")
     assert res.status.name == "ERROR"
     assert len(res.findings) == 0
+

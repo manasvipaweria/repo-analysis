@@ -89,7 +89,12 @@ jobs:
           depscan --version || exit 1
           depscan-vdb path || exit 1
           cdxgen --version || exit 1
-          
+
+      - name: Ensure Codex state directory
+        run: |
+          mkdir -p "$HOME/.codex/state/plugins/codex-security/scans"
+          chmod -R 700 "$HOME/.codex"
+
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:
