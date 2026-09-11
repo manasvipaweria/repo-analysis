@@ -22,10 +22,14 @@ def test_deslint_adapter_skipped_no_react(tmp_path):
 
 def test_deslint_adapter_success_with_findings(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 1
             mock_proc.stdout = json.dumps([
@@ -41,23 +45,57 @@ def test_deslint_adapter_success_with_findings(tmp_path):
                     ]
                 }
             ])
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.COMPLETED
             assert len(result.findings) == 1
 
-def test_deslint_invalid_config(tmp_path):
-    # Non-zero exit + empty stdout + stderr content -> ERROR
+def test_deslint_npm_install_failure(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 1
+            mock_install.stderr = "npm ERR! 404 Not Found"
+            mock_install.stdout = ""
+            mock_run.return_value = mock_install
+            
+            result = adapter.run(str(tmp_path))
+            assert result.status == ToolStatus.ERROR
+            assert "npm install failed" in result.error_message
+            assert len(result.findings) == 0
+
+def test_deslint_missing_plugin_package(tmp_path):
+    (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    adapter = DeslintAdapter()
+    with patch('subprocess.run') as mock_run:
+        with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            mock_run.return_value = mock_install
+            
+            result = adapter.run(str(tmp_path))
+            assert result.status == ToolStatus.ERROR
+            assert "Cannot find package '@deslint/eslint-plugin'" in result.error_message
+            assert len(result.findings) == 0
+
+def test_deslint_invalid_config(tmp_path):
+    # Non-zero exit + empty stdout + stderr content -> ERROR
+    (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
+    adapter = DeslintAdapter()
+    with patch('subprocess.run') as mock_run:
+        with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 2
             mock_proc.stdout = ""
             mock_proc.stderr = "Configuration Error: invalid rule"
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.ERROR
@@ -66,14 +104,18 @@ def test_deslint_invalid_config(tmp_path):
 
 def test_deslint_empty_stdout_non_empty_stderr(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 1
             mock_proc.stdout = "   "
             mock_proc.stderr = "Fatal error parsing"
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.ERROR
@@ -81,14 +123,18 @@ def test_deslint_empty_stdout_non_empty_stderr(tmp_path):
 
 def test_deslint_malformed_json(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 0
             mock_proc.stdout = "{ malformed json ]"
             mock_proc.stderr = ""
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.ERROR
@@ -96,13 +142,17 @@ def test_deslint_malformed_json(tmp_path):
 
 def test_deslint_empty_success(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 0
             mock_proc.stdout = "[]"
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.COMPLETED
@@ -110,9 +160,13 @@ def test_deslint_empty_success(tmp_path):
 
 def test_deslint_adapter_filters_non_deslint_rules(tmp_path):
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 0
             mock_proc.stdout = json.dumps([
@@ -121,33 +175,27 @@ def test_deslint_adapter_filters_non_deslint_rules(tmp_path):
                     "messages": [{"severity": 1, "line": 42, "message": "Generic", "ruleId": "react/jsx-key"}]
                 }
             ])
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             
             result = adapter.run(str(tmp_path))
             assert result.status == ToolStatus.COMPLETED
             assert len(result.findings) == 0
 
-
-# ── New regression tests for improved design-system-aware config ─────────────
-
 def test_deslint_config_contains_allowlist_for_svg_props(tmp_path):
-    """Config must contain allowlist for SVG/grid CSS properties that have no Tailwind equivalent."""
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
-    # Verify config generation contains our key decisions by inspecting the written file
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 0
             mock_proc.stdout = "[]"
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             adapter.run(str(tmp_path))
             
-            # subprocess.run was called — verify the config file content via the call args
-            call_args = mock_run.call_args
-            cwd = call_args.kwargs.get("cwd") or call_args[1].get("cwd") if len(call_args) > 1 else tmp_path
-    
-    # After run, config file is deleted (finally block). Regenerate by inspecting source.
     import inspect
     import src.adapters.deslint_adapter as mod
     src_code = inspect.getsource(mod)
@@ -156,22 +204,23 @@ def test_deslint_config_contains_allowlist_for_svg_props(tmp_path):
     assert "strokeDasharray" in src_code
 
 def test_deslint_config_disables_noisy_rules(tmp_path):
-    """Rules that produce false positives on Apni Mandi must be disabled."""
     import inspect
     import src.adapters.deslint_adapter as mod
     src_code = inspect.getsource(mod)
-    # Must be explicitly off
     assert "'deslint/consistent-border-radius': 'off'" in src_code
     assert "'deslint/consistent-component-spacing': 'off'" in src_code
     assert "'deslint/missing-states': 'off'" in src_code
     assert "'deslint/a11y-color-contrast': 'off'" in src_code
 
 def test_deslint_multiple_findings_different_rules(tmp_path):
-    """Multiple rules can fire in the same run and all findings are captured."""
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 1
             mock_proc.stdout = json.dumps([
@@ -186,7 +235,7 @@ def test_deslint_multiple_findings_different_rules(tmp_path):
                     ]
                 }
             ])
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             result = adapter.run(str(tmp_path))
             
             assert result.status == ToolStatus.COMPLETED
@@ -197,11 +246,14 @@ def test_deslint_multiple_findings_different_rules(tmp_path):
             assert "deslint/responsive-required" in rule_ids
 
 def test_deslint_finding_has_quality_category(tmp_path):
-    """All Deslint findings must be categorized as QUALITY."""
     (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
     adapter = DeslintAdapter()
     with patch('subprocess.run') as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
             mock_proc = MagicMock()
             mock_proc.returncode = 1
             mock_proc.stdout = json.dumps([
@@ -210,22 +262,16 @@ def test_deslint_finding_has_quality_category(tmp_path):
                     "messages": [{"severity": 1, "line": 5, "message": "Inline style", "ruleId": "deslint/no-inline-styles"}]
                 }
             ])
-            mock_run.return_value = mock_proc
+            mock_run.side_effect = [mock_install, mock_proc]
             result = adapter.run(str(tmp_path))
             
             assert len(result.findings) == 1
             assert result.findings[0].category == Category.QUALITY.value
 
 def test_deslint_react_dir_detection_skips_node_modules(tmp_path):
-    """React project detection must skip node_modules. A package.json inside
-    node_modules with react should NOT be used as the react_dir. The adapter
-    falls back to repo root and, finding no @deslint plugin there, errors
-    (ESLint can't resolve the plugin). The important guarantee: it never
-    walks into or writes config inside node_modules."""
     nm = tmp_path / "node_modules" / "some-pkg"
     nm.mkdir(parents=True)
     (nm / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
-    # Real package.json at root without react
     (tmp_path / "package.json").write_text('{"name": "root"}')
 
     adapter = DeslintAdapter()
@@ -239,14 +285,11 @@ def test_deslint_react_dir_detection_skips_node_modules(tmp_path):
 
             result = adapter.run(str(tmp_path))
 
-            # It attempted to run ESLint (not a SKIPPED due to no-react detection)
-            # because root package.json exists even without react deps.
-            # Most importantly: the CWD of the subprocess call must be tmp_path, not inside node_modules.
             if mock_run.called:
                 cwd = mock_run.call_args.kwargs.get("cwd") or mock_run.call_args[1].get("cwd", "")
                 assert "node_modules" not in str(cwd), "Config must never be written inside node_modules"
 
-            # Result is ERROR (ESLint failed) or SKIPPED (no React found). Either is acceptable.
             assert result.status in (ToolStatus.ERROR, ToolStatus.SKIPPED)
+
 
 

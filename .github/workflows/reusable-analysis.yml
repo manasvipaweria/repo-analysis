@@ -95,6 +95,18 @@ jobs:
           mkdir -p "$HOME/.codex/state/plugins/codex-security/scans"
           chmod -R 700 "$HOME/.codex"
 
+      - name: Install target repository frontend dependencies
+        run: |
+          if [ -d "target-repo/frontend" ] && [ -f "target-repo/frontend/package.json" ]; then
+            echo "Installing frontend dependencies in target-repo/frontend..."
+            cd target-repo/frontend
+            NODE_ENV=development npm install --include=dev --no-fund --no-audit
+          elif [ -f "target-repo/package.json" ]; then
+            echo "Installing dependencies in target-repo root..."
+            cd target-repo
+            NODE_ENV=development npm install --include=dev --no-fund --no-audit
+          fi
+
       - name: Run Repo Analysis Orchestrator
         id: analyze
         env:

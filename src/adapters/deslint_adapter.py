@@ -171,38 +171,73 @@ export default [
 
         config_path = os.path.join(react_dir, ".deslint.config.mjs")
         
+        env = os.environ.copy()
+        env["NODE_ENV"] = "development"
+
         try:
             with open(config_path, "w", encoding="utf-8") as f:
                 f.write(config_content)
                 
-            subprocess.run("npm install --include=dev --no-fund --no-audit", cwd=react_dir, shell=True, capture_output=True)
-            
+            install_res = subprocess.run(
+                "npm install --include=dev --no-fund --no-audit",
+                cwd=react_dir,
+                env=env,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+            if install_res.returncode != 0:
+                err_msg = (install_res.stderr or install_res.stdout or "").strip()
+                return ToolResult(
+                    tool=self.tool_name,
+                    status=ToolStatus.ERROR,
+                    findings=[],
+                    error_message=f"npm install failed in {react_dir} with exit code {install_res.returncode}: {err_msg[:500]}"
+                )
+
+            plugin_pkg_path = os.path.join(react_dir, "node_modules", "@deslint", "eslint-plugin")
+            if not os.path.exists(plugin_pkg_path):
+                return ToolResult(
+                    tool=self.tool_name,
+                    status=ToolStatus.ERROR,
+                    findings=[],
+                    error_message=f"Cannot find package '@deslint/eslint-plugin' in {react_dir}. Dependency installation failed or package missing."
+                )
+
             cmd = "npx eslint -c .deslint.config.mjs . -f json"
             result = subprocess.run(
                 cmd,
                 cwd=react_dir,
+                env=env,
                 capture_output=True,
                 shell=True,
-                text=True, encoding="utf-8", errors="replace"
+                text=True,
+                encoding="utf-8",
+                errors="replace"
             )
             
             if not result.stdout.strip():
                 if result.returncode != 0:
+                    err_msg = result.stderr.strip() if result.stderr and result.stderr.strip() else f"ESLint failed with exit code {result.returncode}"
                     return ToolResult(
                         tool=self.tool_name,
                         status=ToolStatus.ERROR,
-                        error_message=f"ESLint failed with exit code {result.returncode}: {result.stderr.strip()[:500]}"
+                        findings=[],
+                        error_message=f"ESLint failed with exit code {result.returncode}: {err_msg[:500]}"
                     )
                 output_data = []
             else:
                 try:
                     output_data = json.loads(result.stdout)
                 except json.JSONDecodeError:
-                    error_src = result.stderr if result.stderr.strip() else result.stdout
+                    error_src = result.stderr.strip() if result.stderr and result.stderr.strip() else result.stdout.strip()
                     return ToolResult(
                         tool=self.tool_name,
                         status=ToolStatus.ERROR,
-                        error_message=f"Failed to parse ESLint JSON (exit code {result.returncode}): {error_src.strip()[:500]}"
+                        findings=[],
+                        error_message=f"Failed to parse ESLint JSON (exit code {result.returncode}): {error_src[:500]}"
                     )
             
             findings = []
