@@ -106,6 +106,8 @@ class Finding:
     trai_dlt_references: Optional[List[str]] = None
     # ePrivacy specific fields
     eprivacy_references: Optional[List[str]] = None
+    # Fingerprint identity
+    fingerprint: Optional[str] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -132,6 +134,7 @@ class Finding:
         tcpa_references: Optional[List[str]] = None,
         trai_dlt_references: Optional[List[str]] = None,
         eprivacy_references: Optional[List[str]] = None,
+        fingerprint: Optional[str] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -176,6 +179,7 @@ class Finding:
         self.tcpa_references = tcpa_references or []
         self.trai_dlt_references = trai_dlt_references or []
         self.eprivacy_references = eprivacy_references or []
+        self.fingerprint = fingerprint
 
 @dataclass
 class TestMetrics:

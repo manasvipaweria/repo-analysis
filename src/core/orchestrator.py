@@ -37,7 +37,7 @@ class Orchestrator:
             if result.findings:
                 all_findings.extend(result.findings)
                 
-        deduped_findings = deduplicate_findings(all_findings)
+        deduped_findings = deduplicate_findings(all_findings, repo_path)
         
         # Phase 1, 2, 3: Shared Data Flow Extraction and Deterministic GDPR Checks
         try:
@@ -421,6 +421,9 @@ class Orchestrator:
 
     def enrich_findings(self, findings: List[Finding], repo_path: str):
         import os
+        from src.core.fingerprinting import assign_fingerprints
+        assign_fingerprints(findings, repo_path)
+        
         for f in findings:
             # Code Context
             file_path = f.location.file if f.location else None
