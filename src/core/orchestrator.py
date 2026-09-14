@@ -159,6 +159,9 @@ class Orchestrator:
                 
             seen_processors = set()
             
+            from src.compliance.vendor_registry import get_vendor_registry
+            registry = get_vendor_registry(repo_path)
+            
             for (proc, field), tx_list in tp_map.items():
                 rule_id = "third-party-transfer"
                 
@@ -183,28 +186,39 @@ class Orchestrator:
                     gdpr_references=["Art. 28", "Art. 44-49"],
                     code_context="International-transfer applicability could not be determined from source code."
                 )
+                
+                vendor_match = registry.is_approved_vendor(proc)
+                if vendor_match.status == "NOT_FOUND":
+                    finding.compliance_finding_type = ComplianceFindingType.HUMAN_REVIEW
+                    finding.priority = "P2"
+                    if finding.severity in ("info", "low"):
+                        finding.severity = "medium"
+                    finding.message = f"UNRECOGNIZED_THIRD_PARTY: Personal data '{field}' is transmitted to an unvetted/unknown processor/service ({proc})."
+                    finding.title = "GDPR: third-party-transfer (Unrecognized Vendor)"
+                    
                 deduped_findings.append(finding)
                 
                 # Human review for 3rd party
                 if proc not in seen_processors:
                     seen_processors.add(proc)
-                    deduped_findings.append(Finding(
-                        category=Category.PRIVACY.value,
-                        severity="info",
-                        file=tx_list[0]["file"],
-                        line=tx_list[0]["line"],
-                        message=f"Third party processor ({proc}) requires legal review for lawful basis, transparency, and processor-agreement adequacy.",
-                        rule_id="human-review-processor",
-                        finding_id=str(uuid.uuid4()),
-                        status="OPEN",
-                        priority="P3",
-                        title="GDPR: human-review-processor",
-                        evidence=FindingEvidence(code_context=proc),
-                        detected_by=["data-flow-extractor"],
-                        merge_blocking=False,
-                        compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
-                        code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
-                    ))
+                    if vendor_match.status == "APPROVED":
+                        deduped_findings.append(Finding(
+                            category=Category.PRIVACY.value,
+                            severity="info",
+                            file=tx_list[0]["file"],
+                            line=tx_list[0]["line"],
+                            message=f"Third party processor ({proc}) requires legal review for lawful basis, transparency, and processor-agreement adequacy.",
+                            rule_id="human-review-processor",
+                            finding_id=str(uuid.uuid4()),
+                            status="OPEN",
+                            priority="P3",
+                            title="GDPR: human-review-processor",
+                            evidence=FindingEvidence(code_context=proc),
+                            detected_by=["data-flow-extractor"],
+                            merge_blocking=False,
+                            compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
+                            code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
+                        ))
                     
                     if proc in ["twilio", "sendgrid", "wrapper[sendMessageToRecipients]", "wrapper[sendNotification]", "wrapper[sendOne]", "wrapper[sendWhatsAppViaMeta]"]:
                         deduped_findings.append(Finding(
