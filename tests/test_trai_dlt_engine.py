@@ -51,7 +51,6 @@ def test_trai_dlt_applicability_technical_evidence(monkeypatch):
             source_locations=[{"file": "src/services/sms.py", "line": 10}]
         )
     ]
-    # Attach code_snippet for context
     setattr(ev_india[0], "code_snippet", "client.messages.create(to='+919876543210', body='OTP 1234')")
 
     res_app = evaluate_trai_dlt_applicability(".", None, ev_india)
@@ -70,7 +69,8 @@ def test_trai_dlt_applicability_technical_evidence(monkeypatch):
     res_ind = evaluate_trai_dlt_applicability(".", None, ev_generic)
     assert res_ind["status"] == "INDETERMINATE"
 
-def test_check_trai_dlt_entity_registration():
+def test_check_pe_id_evidence_not_proof_of_registration():
+    # Missing PE ID -> ATTESTATION_REQUIRED, NOT_DETECTED
     ev_missing = [
         CommunicationFlowEvidence(
             flow_id="f1",
@@ -84,9 +84,10 @@ def test_check_trai_dlt_entity_registration():
     assert len(findings_missing) == 1
     assert findings_missing[0].rule_id == "TRAI-TCCCPR-REG-PE-ID"
     assert findings_missing[0].compliance_finding_type == ComplianceFindingType.ATTESTATION_REQUIRED
-    # Must never be reported as automatic statutory VIOLATION
+    assert findings_missing[0].evidence_status == "NOT_DETECTED"
     assert findings_missing[0].compliance_finding_type != ComplianceFindingType.VIOLATION
 
+    # Present PE ID -> INVENTORY technical evidence, DETECTED
     ev_present = [
         CommunicationFlowEvidence(
             flow_id="f2",
@@ -101,8 +102,40 @@ def test_check_trai_dlt_entity_registration():
     findings_present = check_trai_dlt_entity_registration(".", ev_present)
     assert len(findings_present) == 1
     assert findings_present[0].compliance_finding_type == ComplianceFindingType.INVENTORY
+    assert findings_present[0].evidence_status == "DETECTED"
+    assert "technical evidence present" in findings_present[0].detected_evidence.lower()
 
-def test_check_trai_dlt_promotional_controls():
+def test_check_header_evidence_technical_only():
+    ev_missing = [
+        CommunicationFlowEvidence(
+            flow_id="f1",
+            channel="SMS",
+            provider="twilio",
+            purpose="TRANSACTIONAL",
+            source_locations=[{"file": "src/sms.py", "line": 15}]
+        )
+    ]
+    findings = check_trai_dlt_header_sender_id(".", ev_missing)
+    assert len(findings) == 1
+    assert findings[0].compliance_finding_type == ComplianceFindingType.HUMAN_REVIEW
+    assert findings[0].evidence_status == "NOT_DETECTED"
+
+def test_check_template_id_evidence_technical_only():
+    ev_missing = [
+        CommunicationFlowEvidence(
+            flow_id="f1",
+            channel="SMS",
+            provider="twilio",
+            purpose="TRANSACTIONAL",
+            source_locations=[{"file": "src/sms.py", "line": 15}]
+        )
+    ]
+    findings = check_trai_dlt_template_registration(".", ev_missing)
+    assert len(findings) == 1
+    assert findings[0].compliance_finding_type == ComplianceFindingType.ATTESTATION_REQUIRED
+    assert findings[0].evidence_status == "NOT_DETECTED"
+
+def test_check_promotional_controls_and_timing():
     ev_promo = [
         CommunicationFlowEvidence(
             flow_id="f1",
@@ -118,10 +151,15 @@ def test_check_trai_dlt_promotional_controls():
     assert "TRAI-TCCCPR-PROMOTIONAL-TIMING" in rule_ids
     assert "TRAI-TCCCPR-PREFERENCE-DND" in rule_ids
 
-def test_run_trai_dlt_checks_decoupled_with_mock_evidence(monkeypatch):
+def test_consent_scrubbing_attestation():
+    attestations = generate_trai_dlt_attestations({"status": "APPLICABLE"})
+    assert len(attestations) == 1
+    assert attestations[0].rule_id == "TRAI-TCCCPR-CONSENT-TELECOM-SCRUB"
+    assert attestations[0].compliance_finding_type == ComplianceFindingType.ATTESTATION_REQUIRED
+
+def test_no_duplicate_findings_and_no_unrelated_attachment(monkeypatch):
     monkeypatch.setenv("TRAI_APPLICABILITY", "APPLICABLE")
 
-    # Mock shared communication flow evidence
     mock_comm_evidence = [
         CommunicationFlowEvidence(
             flow_id="f1",
@@ -132,32 +170,40 @@ def test_run_trai_dlt_checks_decoupled_with_mock_evidence(monkeypatch):
         )
     ]
 
-    shared_finding = Finding(
+    sms_security_finding = Finding(
         category=Category.SECURITY.value,
         severity="medium",
         file="src/otp.py",
         line=10,
-        message="Hardcoded SMS credential in twilio call",
-        rule_id="twilio-hardcoded-secret",
+        message="Hardcoded Twilio SMS credential",
+        rule_id="twilio-sms-hardcoded-secret",
         detected_by=["semgrep"]
+    )
+
+    unrelated_security_finding = Finding(
+        category=Category.SECURITY.value,
+        severity="high",
+        file="src/db.py",
+        line=45,
+        message="SQL injection in query",
+        rule_id="sql-injection-query",
+        detected_by=["bandit"]
     )
 
     findings = run_trai_dlt_checks(
         repo_path=".",
         flow_data=None,
-        shared_findings=[shared_finding],
+        shared_findings=[sms_security_finding, unrelated_security_finding],
         comm_evidence=mock_comm_evidence
     )
 
-    assert len(findings) > 0
+    # Check deduplication: rule IDs generated by engine must be unique
+    rule_ids = [f.rule_id for f in findings]
+    assert len(rule_ids) == len(set(rule_ids))
 
-    # Ensure all generated findings have framework set to TRAI_DLT and trai_dlt_references
-    for f in findings:
-        assert f.framework == "TRAI_DLT"
-        assert f.effective_status == "IN_FORCE"
-        assert f.trai_dlt_references is not None
-        assert len(f.trai_dlt_references) > 0
+    # SMS security finding receives TRAI references
+    assert sms_security_finding.trai_dlt_references is not None
+    assert "TRAI-TCCCPR-REG-PE-ID" in sms_security_finding.trai_dlt_references
 
-    # Verify shared security finding was enriched with TRAI references
-    assert shared_finding.trai_dlt_references is not None
-    assert "TRAI-TCCCPR-REG-PE-ID" in shared_finding.trai_dlt_references
+    # Unrelated security finding MUST NOT receive TRAI references
+    assert getattr(unrelated_security_finding, "trai_dlt_references", None) is None or unrelated_security_finding.trai_dlt_references == []

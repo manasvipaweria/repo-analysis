@@ -311,6 +311,14 @@ class Orchestrator:
             except Exception as e:
                 print(f"TRAI/DLT engine execution error: {e}")
 
+            # EU ePrivacy Directive Checks
+            try:
+                from src.compliance.eprivacy_engine import run_eprivacy_checks
+                eprivacy_summary, eprivacy_findings = run_eprivacy_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
+                deduped_findings.extend(eprivacy_findings)
+            except Exception as e:
+                print(f"ePrivacy engine execution error: {e}")
+
         except Exception as e:
             print(f"Compliance extraction error: {e}")
             
@@ -476,6 +484,14 @@ class Orchestrator:
                 existing_trai = set(f.trai_dlt_references or [])
                 existing_trai.update(trai_refs)
                 f.trai_dlt_references = sorted(list(existing_trai))
+
+            # ePrivacy Mapping
+            from src.compliance.eprivacy_mapping import get_eprivacy_references_for_rule
+            eprivacy_refs = get_eprivacy_references_for_rule(f.rule_id, f.detected_by)
+            if eprivacy_refs:
+                existing_eprivacy = set(f.eprivacy_references or [])
+                existing_eprivacy.update(eprivacy_refs)
+                f.eprivacy_references = sorted(list(existing_eprivacy))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec

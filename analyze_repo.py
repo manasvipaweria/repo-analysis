@@ -267,6 +267,28 @@ def main():
             print(f"India TRAI / TCCCPR / DLT Technical Readiness: Execution Error ({e})")
             print("------------------------")
 
+        # ePrivacy summary section
+        try:
+            from src.compliance.eprivacy_engine import evaluate_eprivacy_applicability
+            eprivacy_app, eprivacy_reasons, eprivacy_src = evaluate_eprivacy_applicability(repo_path)
+            eprivacy_findings = [f for f in report.findings if getattr(f, 'framework', None) == "EPRIVACY" or (getattr(f, 'eprivacy_references', None) and len(f.eprivacy_references) > 0)]
+            
+            terminal_items = [f for f in eprivacy_findings if any("ART5-3-TERMINAL" in r for r in getattr(f, 'eprivacy_references', []))]
+            traffic_items = [f for f in eprivacy_findings if any("ART6-TRAFFIC" in r for r in getattr(f, 'eprivacy_references', []))]
+            marketing_items = [f for f in eprivacy_findings if any("ART13-DIRECT-MARKETING" in r for r in getattr(f, 'eprivacy_references', []))]
+            eprivacy_attestations = [f for f in eprivacy_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED or getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.HUMAN_REVIEW]
+            
+            print(f"EU ePrivacy Directive Technical Readiness:")
+            print(f"  - Applicability State: {eprivacy_app} ({eprivacy_src})")
+            print(f"  - Article 5(3) Terminal Equipment Evidence: {len(terminal_items)}")
+            print(f"  - Article 6 Traffic Data Evidence: {len(traffic_items)}")
+            print(f"  - Article 13 Direct Marketing Evidence: {len(marketing_items)}")
+            print(f"  - Human Review / Attestations Required: {len(eprivacy_attestations)} items")
+            print("------------------------")
+        except Exception as e:
+            print(f"EU ePrivacy Directive Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():

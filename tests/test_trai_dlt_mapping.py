@@ -3,12 +3,31 @@ Unit tests for India TRAI / TCCCPR / DLT mapping and classification helpers.
 """
 
 import pytest
-from src.compliance.trai_dlt_constants import TRAI_COMMUNICATION_TYPES
+from src.compliance.trai_dlt_constants import (
+    TRAI_COMMUNICATION_TYPES,
+    TRAI_DLT_REQUIREMENTS
+)
 from src.compliance.trai_dlt_mapping import (
     classify_trai_communication_type,
     detect_dlt_parameters_in_text,
     get_trai_dlt_references_for_rule
 )
+
+def test_statutory_mappings_have_verified_authoritative_references():
+    for req_id, spec in TRAI_DLT_REQUIREMENTS.items():
+        assert "authoritative_reference" in spec, f"Missing authoritative_reference for {req_id}"
+        assert len(spec["authoritative_reference"]) > 0
+        assert "classification" in spec, f"Missing classification for {req_id}"
+
+def test_promotional_timing_authoritative_source():
+    spec = TRAI_DLT_REQUIREMENTS["TRAI-TCCCPR-PROMOTIONAL-TIMING"]
+    assert "Regulation 14(1)" in spec["authoritative_reference"]
+    assert "Schedule II" in spec["authoritative_reference"]
+
+def test_consent_scrubbing_authoritative_source():
+    spec = TRAI_DLT_REQUIREMENTS["TRAI-TCCCPR-CONSENT-TELECOM-SCRUB"]
+    assert "Regulation 10" in spec["authoritative_reference"]
+    assert "Regulation 12" in spec["authoritative_reference"]
 
 def test_classify_trai_communication_type():
     assert classify_trai_communication_type("TRANSACTIONAL") == TRAI_COMMUNICATION_TYPES["SERVICE_TRANSACTIONAL"]
@@ -41,10 +60,13 @@ def test_detect_dlt_parameters_in_text():
     assert res_none["has_header"] is False
     assert res_none["has_template_id"] is False
 
-def test_get_trai_dlt_references_for_rule():
+def test_get_trai_dlt_references_for_rule_strict():
+    # Matching rule IDs
     refs = get_trai_dlt_references_for_rule("twilio-sms-dispatch")
     assert "TRAI-TCCCPR-REG-PE-ID" in refs
     assert "TRAI-TCCCPR-REG-HEADER-ID" in refs
 
-    empty_refs = get_trai_dlt_references_for_rule("unrelated-security-rule")
-    assert empty_refs == []
+    # Unrelated security rules MUST NOT receive TRAI references
+    unrelated_rules = ["sql-injection", "jwt-secret-hardcoded", "insecure-deserialization", "cors-misconfiguration"]
+    for rule in unrelated_rules:
+        assert get_trai_dlt_references_for_rule(rule) == [], f"Unrelated rule {rule} received TRAI references"

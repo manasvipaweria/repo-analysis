@@ -74,13 +74,17 @@ def get_trai_dlt_references_for_rule(
     detected_by: Optional[List[str]] = None
 ) -> List[str]:
     """
-    Maps security scanner rule IDs / tool outputs to relevant TRAI requirement IDs.
+    Maps security scanner rule IDs / tool outputs to relevant TRAI requirement IDs where appropriate.
+    Attached ONLY when the underlying finding genuinely relates to SMS, telephony, or DLT messaging.
+    Unrelated security findings (e.g. SQL injection, JWT secrets) receive empty references.
     """
     if not rule_id:
         return []
 
     r_lower = rule_id.lower()
-    if any(kw in r_lower for kw in ["sms", "twilio", "dlt", "otp", "telecom"]):
+    tools = [t.lower() for t in (detected_by or [])]
+
+    if any(kw in r_lower for kw in ["sms", "twilio", "dlt", "telecom"]) or ("phone" in r_lower and "message" in r_lower):
         return ["TRAI-TCCCPR-REG-PE-ID", "TRAI-TCCCPR-REG-HEADER-ID", "TRAI-TCCCPR-REG-TEMPLATE-ID"]
 
     return []

@@ -148,19 +148,19 @@ def check_trai_dlt_entity_registration(
             severity=Severity.MEDIUM,
             file=sample_file,
             line=sample_line,
-            message=f"{req['title']}: No Principal Entity (PE) ID parameter or configuration detected for SMS flows.",
+            message=f"{req['title']}: No PE ID parameter or configuration detected in messaging code.",
             rule_id="TRAI-TCCCPR-REG-PE-ID",
             detected_by=["repo-orchestrator-trai-dlt-engine"],
             compliance_finding_type=ComplianceFindingType.ATTESTATION_REQUIRED,
             requirement=req["requirement"],
-            detected_evidence=f"SMS communication flow detected in {sample_file or 'repository'} without DLT Principal Entity (PE) ID binding in code.",
+            detected_evidence=f"SMS communication flow detected in {sample_file or 'repository'} without DLT Principal Entity (PE) ID binding parameter in code.",
             recommended_action=req["recommended_action"],
-            human_review_required="Verify DLT Principal Entity registration and configure 19-digit PE ID in messaging payload or provider portal.",
+            human_review_required="Verify Principal Entity registration on an authorized Access Provider DLT portal and configure 19-digit PE ID in messaging settings.",
             framework=FRAMEWORK_TRAI_DLT,
-            section="TCCCPR 2018 Reg 3",
+            section="TCCCPR 2018 Reg 3(1)",
             effective_status=TRAI_EFFECTIVE_STATUS,
             effective_from=TRAI_EFFECTIVE_FROM,
-            evidence_status="ATTESTATION_REQUIRED",
+            evidence_status="NOT_DETECTED",
             trai_dlt_references=["TRAI-TCCCPR-REG-PE-ID"]
         ))
     else:
@@ -169,19 +169,19 @@ def check_trai_dlt_entity_registration(
             severity=Severity.INFO,
             file=sample_file,
             line=sample_line,
-            message=f"{req['title']}: DLT Principal Entity (PE) ID configuration parameter detected.",
+            message=f"{req['title']}: DLT PE ID parameter evidence detected in source code configuration.",
             rule_id="TRAI-TCCCPR-REG-PE-ID",
             detected_by=["repo-orchestrator-trai-dlt-engine"],
             compliance_finding_type=ComplianceFindingType.INVENTORY,
             requirement=req["requirement"],
-            detected_evidence=f"DLT PE ID parameter detected in SMS communication flow ({sample_file or 'repository'}).",
+            detected_evidence=f"DLT PE ID parameter detected in SMS communication flow context ({sample_file or 'repository'}). Technical evidence present; live DLT portal approval state requires external verification.",
             recommended_action="Ensure PE ID is registered and active on licensed Indian Access Provider DLT ledger.",
             human_review_required="Confirm DLT PE ID matches active corporate registration.",
             framework=FRAMEWORK_TRAI_DLT,
-            section="TCCCPR 2018 Reg 3",
+            section="TCCCPR 2018 Reg 3(1)",
             effective_status=TRAI_EFFECTIVE_STATUS,
             effective_from=TRAI_EFFECTIVE_FROM,
-            evidence_status="VERIFIED",
+            evidence_status="DETECTED",
             trai_dlt_references=["TRAI-TCCCPR-REG-PE-ID"]
         ))
 
@@ -219,19 +219,40 @@ def check_trai_dlt_header_sender_id(
             severity=Severity.LOW,
             file=sample_file,
             line=sample_line,
-            message=f"{req['title']}: DLT SMS Header / Sender ID binding not explicitly verified in source code.",
+            message=f"{req['title']}: Header ID parameter binding not explicitly detected in code.",
             rule_id="TRAI-TCCCPR-REG-HEADER-ID",
             detected_by=["repo-orchestrator-trai-dlt-engine"],
             compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
             requirement=req["requirement"],
             detected_evidence=f"SMS communication flow detected in {sample_file or 'repository'} without explicit DLT Header / Sender ID parameter.",
             recommended_action=req["recommended_action"],
-            human_review_required="Verify that SMS Sender ID / Header (e.g. 6-character alphanumeric or 6-digit numeric) is registered on DLT portal.",
+            human_review_required="Verify that SMS Sender ID / Header (e.g., 6-character alphanumeric or 6-digit numeric) is registered on DLT portal.",
             framework=FRAMEWORK_TRAI_DLT,
-            section="TCCCPR 2018 Reg 8",
+            section="TCCCPR 2018 Reg 8(1)-(3)",
             effective_status=TRAI_EFFECTIVE_STATUS,
             effective_from=TRAI_EFFECTIVE_FROM,
-            evidence_status="HUMAN_REVIEW",
+            evidence_status="NOT_DETECTED",
+            trai_dlt_references=["TRAI-TCCCPR-REG-HEADER-ID"]
+        ))
+    else:
+        findings.append(Finding(
+            category=Category.PRIVACY,
+            severity=Severity.INFO,
+            file=sample_file,
+            line=sample_line,
+            message=f"{req['title']}: DLT Header ID parameter evidence detected.",
+            rule_id="TRAI-TCCCPR-REG-HEADER-ID",
+            detected_by=["repo-orchestrator-trai-dlt-engine"],
+            compliance_finding_type=ComplianceFindingType.INVENTORY,
+            requirement=req["requirement"],
+            detected_evidence=f"DLT Header / Sender ID parameter detected in SMS communication flow context ({sample_file or 'repository'}).",
+            recommended_action="Ensure Header ID is registered and bound to PE ID on Access Provider DLT portal.",
+            human_review_required="Confirm DLT Header ID registration.",
+            framework=FRAMEWORK_TRAI_DLT,
+            section="TCCCPR 2018 Reg 8(1)-(3)",
+            effective_status=TRAI_EFFECTIVE_STATUS,
+            effective_from=TRAI_EFFECTIVE_FROM,
+            evidence_status="DETECTED",
             trai_dlt_references=["TRAI-TCCCPR-REG-HEADER-ID"]
         ))
 
@@ -278,10 +299,31 @@ def check_trai_dlt_template_registration(
             recommended_action=req["recommended_action"],
             human_review_required="Ensure every SMS message payload passes the approved DLT Content Template ID matching registered text patterns.",
             framework=FRAMEWORK_TRAI_DLT,
-            section="TCCCPR 2018 Reg 9",
+            section="TCCCPR 2018 Reg 9(1)-(2)",
             effective_status=TRAI_EFFECTIVE_STATUS,
             effective_from=TRAI_EFFECTIVE_FROM,
-            evidence_status="ATTESTATION_REQUIRED",
+            evidence_status="NOT_DETECTED",
+            trai_dlt_references=["TRAI-TCCCPR-REG-TEMPLATE-ID"]
+        ))
+    else:
+        findings.append(Finding(
+            category=Category.PRIVACY,
+            severity=Severity.INFO,
+            file=sample_file,
+            line=sample_line,
+            message=f"{req['title']}: DLT Content Template ID parameter evidence detected.",
+            rule_id="TRAI-TCCCPR-REG-TEMPLATE-ID",
+            detected_by=["repo-orchestrator-trai-dlt-engine"],
+            compliance_finding_type=ComplianceFindingType.INVENTORY,
+            requirement=req["requirement"],
+            detected_evidence=f"DLT Template ID parameter detected in SMS dispatch payload ({sample_file or 'repository'}).",
+            recommended_action="Ensure Template ID matches registered text pattern on DLT portal.",
+            human_review_required="Confirm DLT Template ID approval status.",
+            framework=FRAMEWORK_TRAI_DLT,
+            section="TCCCPR 2018 Reg 9(1)-(2)",
+            effective_status=TRAI_EFFECTIVE_STATUS,
+            effective_from=TRAI_EFFECTIVE_FROM,
+            evidence_status="DETECTED",
             trai_dlt_references=["TRAI-TCCCPR-REG-TEMPLATE-ID"]
         ))
 
@@ -327,7 +369,7 @@ def check_trai_dlt_promotional_controls(
         recommended_action=timing_req["recommended_action"],
         human_review_required="Verify that background message dispatch queues enforce 09:00 AM to 09:00 PM local time restrictions for promotional SMS.",
         framework=FRAMEWORK_TRAI_DLT,
-        section="TCCCPR 2018 Schedule II",
+        section="TCCCPR 2018 Reg 14(1) & Schedule II",
         effective_status=TRAI_EFFECTIVE_STATUS,
         effective_from=TRAI_EFFECTIVE_FROM,
         evidence_status="HUMAN_REVIEW",
@@ -341,7 +383,7 @@ def check_trai_dlt_promotional_controls(
         severity=Severity.MEDIUM,
         file=sample_file,
         line=sample_line,
-        message=f"{dnd_req['title']}: Promotional communication flow requires National Customer Preference Register (NCPR / DND) scrubbing.",
+        message=f"{dnd_req['title']}: Promotional communication flow requires National Customer Preference Register (NCPR / DND) preference scrubbing.",
         rule_id="TRAI-TCCCPR-PREFERENCE-DND",
         detected_by=["repo-orchestrator-trai-dlt-engine"],
         compliance_finding_type=ComplianceFindingType.ATTESTATION_REQUIRED,
@@ -350,7 +392,7 @@ def check_trai_dlt_promotional_controls(
         recommended_action=dnd_req["recommended_action"],
         human_review_required="Verify DLT telecom carrier preference scrubbing or internal NCPR DND list integration.",
         framework=FRAMEWORK_TRAI_DLT,
-        section="TCCCPR 2018 Reg 4",
+        section="TCCCPR 2018 Reg 4(1) & Reg 11",
         effective_status=TRAI_EFFECTIVE_STATUS,
         effective_from=TRAI_EFFECTIVE_FROM,
         evidence_status="ATTESTATION_REQUIRED",
@@ -381,9 +423,9 @@ def generate_trai_dlt_attestations(applicability_state: Dict[str, Any]) -> List[
         requirement=req["requirement"],
         detected_evidence=f"Applicability state: {applicability_state.get('status')}. Legal/operational attestation required for DLT consent ledger alignment.",
         recommended_action=req["recommended_action"],
-        human_review_required="Provide organizational attestation confirming customer consent recording on DLT consent scrubbers.",
+        human_review_required="Provide organizational attestation confirming customer consent recording on DLT consent scrubbers and legal validity of consent templates.",
         framework=FRAMEWORK_TRAI_DLT,
-        section="TCCCPR 2018 Reg 10-12",
+        section="TCCCPR 2018 Reg 10 & 12",
         effective_status=TRAI_EFFECTIVE_STATUS,
         effective_from=TRAI_EFFECTIVE_FROM,
         evidence_status="ATTESTATION_REQUIRED",
@@ -421,7 +463,7 @@ def run_trai_dlt_checks(
     findings.extend(check_trai_dlt_promotional_controls(repo_path, comm_evidence))
     findings.extend(generate_trai_dlt_attestations(applicability))
 
-    # Annotate shared security findings with TRAI/DLT references where applicable
+    # Annotate shared security findings with TRAI/DLT references ONLY where evidence genuinely supports TRAI mapping
     if shared_findings:
         for f in shared_findings:
             refs = get_trai_dlt_references_for_rule(f.rule_id, f.detected_by)

@@ -104,6 +104,8 @@ class Finding:
     tcpa_references: Optional[List[str]] = None
     # TRAI / DLT specific fields
     trai_dlt_references: Optional[List[str]] = None
+    # ePrivacy specific fields
+    eprivacy_references: Optional[List[str]] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -129,6 +131,7 @@ class Finding:
         spdi_references: Optional[List[str]] = None,
         tcpa_references: Optional[List[str]] = None,
         trai_dlt_references: Optional[List[str]] = None,
+        eprivacy_references: Optional[List[str]] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -172,6 +175,7 @@ class Finding:
         self.spdi_references = spdi_references or []
         self.tcpa_references = tcpa_references or []
         self.trai_dlt_references = trai_dlt_references or []
+        self.eprivacy_references = eprivacy_references or []
 
 @dataclass
 class TestMetrics:
@@ -272,6 +276,7 @@ class Report:
                 spdi_references=fd.get("spdi_references", []),
                 tcpa_references=fd.get("tcpa_references", []),
                 trai_dlt_references=fd.get("trai_dlt_references", []),
+                eprivacy_references=fd.get("eprivacy_references", []),
                 file=None,  # Legacy args
                 line=None,
                 message=""
