@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      orchestrator_ref:
+        description: 'Branch or tag of the orchestrator repository to use'
+        required: false
+        type: string
+        default: 'main'
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
@@ -48,6 +53,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: manasvipaweria/repo-analysis
+          ref: ${{ inputs.orchestrator_ref }}
           path: orchestrator-repo
           
       - name: Set up Python
