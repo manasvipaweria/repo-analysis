@@ -411,13 +411,16 @@ class Orchestrator:
             )
             
         from src.core.finding_grouping import group_findings
+        from src.core.finding_prioritization import prioritize_findings
+
         finding_groups, grouped_findings = group_findings(deduped_findings)
+        prioritized_findings = prioritize_findings(grouped_findings, finding_groups)
             
         report = Report(
             repo=repo_url,
             timestamp=timestamp,
             summary=summary,
-            findings=grouped_findings,
+            findings=prioritized_findings,
             data_flow=flow_data if 'flow_data' in locals() else None,
             finding_groups=finding_groups
         )

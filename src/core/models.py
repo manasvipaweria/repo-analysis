@@ -114,6 +114,9 @@ class Finding:
     # Fingerprint identity
     fingerprint: Optional[str] = None
     group_id: Optional[str] = None
+    priority_score: Optional[int] = None
+    priority_level: Optional[str] = None
+    priority_reasons: List[str] = field(default_factory=list)
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -142,6 +145,9 @@ class Finding:
         eprivacy_references: Optional[List[str]] = None,
         fingerprint: Optional[str] = None,
         group_id: Optional[str] = None,
+        priority_score: Optional[int] = None,
+        priority_level: Optional[str] = None,
+        priority_reasons: Optional[List[str]] = None
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -188,6 +194,9 @@ class Finding:
         self.eprivacy_references = eprivacy_references or []
         self.fingerprint = fingerprint
         self.group_id = group_id
+        self.priority_score = priority_score
+        self.priority_level = priority_level
+        self.priority_reasons = priority_reasons or []
 
 @dataclass
 class TestMetrics:
@@ -305,6 +314,9 @@ class Report:
                 eprivacy_references=fd.get("eprivacy_references", []),
                 fingerprint=fd.get("fingerprint"),
                 group_id=fd.get("group_id"),
+                priority_score=fd.get("priority_score"),
+                priority_level=fd.get("priority_level"),
+                priority_reasons=fd.get("priority_reasons", []),
                 file=None,  # Legacy args
                 line=None,
                 message=""

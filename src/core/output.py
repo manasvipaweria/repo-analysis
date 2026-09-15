@@ -30,7 +30,8 @@ def write_csv_report(report: Report, filepath: str) -> None:
             "Merge Blocking", "File", "Line", "Title", "Description", 
             "Rule ID", "Code Context", "Detected By", "GDPR Articles",
             "Requirement", "Detected Evidence", "Recommended Action", "Human Review Required",
-            "AI Summary", "Security Impact", "Remediation", "False Positive Prediction"
+            "AI Summary", "Security Impact", "Remediation", "False Positive Prediction",
+            "Priority Score", "Priority Level", "Priority Reasons"
         ])
         for finding in report.findings:
             detected_by_str = ", ".join(finding.detected_by)
@@ -73,5 +74,8 @@ def write_csv_report(report: Report, filepath: str) -> None:
                 ai_summary,
                 ai_impact,
                 ai_remediation,
-                ai_fp
+                ai_fp,
+                finding.priority_score if hasattr(finding, 'priority_score') else "",
+                finding.priority_level if hasattr(finding, 'priority_level') else "",
+                "; ".join(finding.priority_reasons) if hasattr(finding, 'priority_reasons') and finding.priority_reasons else ""
             ])
