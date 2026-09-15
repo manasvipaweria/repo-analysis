@@ -410,12 +410,16 @@ class Orchestrator:
                 tools=tool_summaries
             )
             
+        from src.core.finding_grouping import group_findings
+        finding_groups, grouped_findings = group_findings(deduped_findings)
+            
         report = Report(
             repo=repo_url,
             timestamp=timestamp,
             summary=summary,
-            findings=deduped_findings,
-            data_flow=flow_data if 'flow_data' in locals() else None
+            findings=grouped_findings,
+            data_flow=flow_data if 'flow_data' in locals() else None,
+            finding_groups=finding_groups
         )
         return report
 

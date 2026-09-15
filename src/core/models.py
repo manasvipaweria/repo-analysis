@@ -2,6 +2,11 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
+class GroupConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
 class Severity(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
@@ -108,6 +113,7 @@ class Finding:
     eprivacy_references: Optional[List[str]] = None
     # Fingerprint identity
     fingerprint: Optional[str] = None
+    group_id: Optional[str] = None
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -135,6 +141,7 @@ class Finding:
         trai_dlt_references: Optional[List[str]] = None,
         eprivacy_references: Optional[List[str]] = None,
         fingerprint: Optional[str] = None,
+        group_id: Optional[str] = None,
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -180,6 +187,7 @@ class Finding:
         self.trai_dlt_references = trai_dlt_references or []
         self.eprivacy_references = eprivacy_references or []
         self.fingerprint = fingerprint
+        self.group_id = group_id
 
 @dataclass
 class TestMetrics:
@@ -197,6 +205,19 @@ class ToolResult:
     error_message: Optional[str] = None
 
 @dataclass
+
+@dataclass
+class FindingGroup:
+    group_id: str
+    title: str
+    confidence: GroupConfidence
+    grouping_reason: str
+    fingerprints: List[str] = field(default_factory=list)
+    category: Optional[str] = None
+    severity: Optional[str] = None
+    rule_id: Optional[str] = None
+
+@dataclass
 class CategorySummary:
     status: CategoryStatus
     count: int
@@ -210,6 +231,7 @@ class Report:
     summary: Dict[str, CategorySummary] = field(default_factory=dict)
     findings: List[Finding] = field(default_factory=list)
     data_flow: Optional[Dict[str, Any]] = None
+    finding_groups: List[FindingGroup] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         import dataclasses
@@ -282,16 +304,31 @@ class Report:
                 trai_dlt_references=fd.get("trai_dlt_references", []),
                 eprivacy_references=fd.get("eprivacy_references", []),
                 fingerprint=fd.get("fingerprint"),
+                group_id=fd.get("group_id"),
                 file=None,  # Legacy args
                 line=None,
                 message=""
             )
             findings_list.append(f)
             
+        groups_list = []
+        for gd in data.get("finding_groups", []):
+            groups_list.append(FindingGroup(
+                group_id=gd.get("group_id", ""),
+                title=gd.get("title", ""),
+                confidence=GroupConfidence(gd.get("confidence", "LOW")),
+                grouping_reason=gd.get("grouping_reason", ""),
+                fingerprints=gd.get("fingerprints", []),
+                category=gd.get("category"),
+                severity=gd.get("severity"),
+                rule_id=gd.get("rule_id")
+            ))
+
         return cls(
             repo=data.get("repo", ""),
             timestamp=data.get("timestamp", ""),
             summary=summary_dict,
             findings=findings_list,
-            data_flow=data.get("data_flow")
+            data_flow=data.get("data_flow"),
+            finding_groups=groups_list
         )
