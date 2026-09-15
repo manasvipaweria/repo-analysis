@@ -54,6 +54,8 @@ def main():
     )
     parser.add_argument("--output", help="Comma-separated list of outputs (json,csv)", default="json,csv")
     parser.add_argument("--run-ai", action="store_true", help="Run the AI analysis stage after scanner execution")
+    parser.add_argument("--revalidate", help="Revalidate a specific finding by its fingerprint")
+    parser.add_argument("--report-file", help="Path to existing JSON report to find the original finding", default="report.json")
     
     args = parser.parse_args()
     
@@ -77,6 +79,40 @@ def main():
             repo_path = clone_repo(args.repo_url, args.branch)
             cleanup = True
             print(f"[*] Cloned to {repo_path}")
+            
+        if args.revalidate:
+            print(f"[*] Starting revalidation for fingerprint: {args.revalidate}")
+            import json
+            from src.core.models import Report, Finding
+            from src.core.revalidation import revalidate_finding
+            
+            if not os.path.exists(args.report_file):
+                print(f"[-] Error: Report file {args.report_file} not found.")
+                sys.exit(1)
+                
+            with open(args.report_file, 'r', encoding='utf-8') as f:
+                report_data = json.load(f)
+                
+            original_report = Report.from_dict(report_data)
+            
+            target_finding = next((f for f in original_report.findings if getattr(f, 'fingerprint', None) == args.revalidate), None)
+            if not target_finding:
+                print(f"[-] Error: Finding with fingerprint {args.revalidate} not found in {args.report_file}")
+                sys.exit(1)
+                
+            print(f"[*] Original finding identified from {', '.join(target_finding.detected_by)}")
+            result = revalidate_finding(target_finding, repo_path, ALL_ADAPTERS)
+            
+            print(f"\n--- Revalidation Result ---")
+            print(f"Fingerprint: {result.fingerprint}")
+            print(f"Status:      {result.status.value}")
+            print(f"Tool(s) run: {result.tool}")
+            print(f"Message:     {result.message}")
+            if result.current_finding:
+                print(f"Found at:    {result.current_finding.location.file}:{result.current_finding.location.line}")
+            print("---------------------------")
+            
+            sys.exit(0)
             
         orchestrator = Orchestrator(adapters=adapters)
         

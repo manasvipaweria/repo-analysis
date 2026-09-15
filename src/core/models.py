@@ -281,6 +281,7 @@ class Report:
                 tcpa_references=fd.get("tcpa_references", []),
                 trai_dlt_references=fd.get("trai_dlt_references", []),
                 eprivacy_references=fd.get("eprivacy_references", []),
+                fingerprint=fd.get("fingerprint"),
                 file=None,  # Legacy args
                 line=None,
                 message=""
