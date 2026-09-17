@@ -41,6 +41,14 @@ def test_codex_architecture_adapter_success(mock_openai, mock_env):
             }
         ]
     })
+    # Add usage to response
+    mock_response.usage = MagicMock()
+    mock_response.usage.prompt_tokens = 500
+    mock_response.usage.completion_tokens = 200
+    mock_response.usage.total_tokens = 700
+    mock_response.usage.prompt_tokens_details = MagicMock()
+    mock_response.usage.prompt_tokens_details.cached_tokens = 100
+
     mock_client.chat.completions.create.return_value = mock_response
     
     res = adapter.run(".")
@@ -61,6 +69,34 @@ def test_codex_architecture_adapter_success(mock_openai, mock_env):
     assert "God class detected" in f1.description
     assert f1.rule_id == "ARCH-001"
     assert "codex-architecture" in f1.detected_by
+
+    assert res.ai_usage is not None
+    assert res.ai_usage.input_tokens == 500
+    assert res.ai_usage.output_tokens == 200
+    assert res.ai_usage.total_tokens == 700
+    assert res.ai_usage.cached_tokens == 100
+    assert res.ai_usage.estimated_cost is None
+    assert res.ai_usage.usage_source == "provider-reported"
+
+@patch("src.adapters.codex_architecture_adapter.openai")
+def test_codex_architecture_adapter_success_no_usage(mock_openai, mock_env):
+    adapter = CodexArchitectureAdapter()
+    
+    mock_client = MagicMock()
+    mock_openai.OpenAI.return_value = mock_client
+    
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = json.dumps({
+        "findings": []
+    })
+    # No usage metadata attached
+    mock_response.usage = None
+
+    mock_client.chat.completions.create.return_value = mock_response
+    
+    res = adapter.run(".")
+    assert res.status.name == "COMPLETED"
+    assert res.ai_usage is None
 
 @patch("src.adapters.codex_architecture_adapter.openai")
 def test_codex_architecture_adapter_api_error(mock_openai, mock_env):

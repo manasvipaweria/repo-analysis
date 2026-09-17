@@ -20,6 +20,21 @@ class Orchestrator:
         for adapter in self.adapters:
             try:
                 result = adapter.run(repo_path)
+                if getattr(result, 'ai_usage', None):
+                    u = result.ai_usage
+                    tool = result.tool
+                    source = u.usage_source
+                    inp = u.input_tokens
+                    out = u.output_tokens
+                    tot = u.total_tokens
+                    cached = u.cached_tokens
+                    cost = u.estimated_cost
+                    
+                    if source == "unavailable" and cost is not None:
+                        print(f"[{tool}] AI Token Usage - unavailable; CLI reported estimated cost: ${cost:.2f}")
+                    else:
+                        cost_str = f"${cost:.2f}" if cost is not None else "N/A"
+                        print(f"[{tool}] AI Token Usage - Input: {inp} | Cached: {cached} | Output: {out} | Total: {tot} | Estimated Cost: {cost_str} | Source: {source}")
             except Exception as e:
                 # Fallback if adapter completely crashes
                 result = ToolResult(
@@ -401,6 +416,10 @@ class Orchestrator:
                     }
                 if r.error_message:
                     tool_dict["error_message"] = r.error_message
+                if getattr(r, 'ai_usage', None):
+                    import dataclasses
+                    # Convert AIUsage to dict natively, handling Enums if any.
+                    tool_dict["ai_usage"] = dataclasses.asdict(r.ai_usage)
                     
                 tool_summaries[r.tool] = tool_dict
                 

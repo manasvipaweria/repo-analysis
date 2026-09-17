@@ -69,12 +69,10 @@ class GitHubClient:
     def get_repos(self, org, is_user=False):
         repos = []
         page = 1
-        prefix = "users" if is_user else "orgs"
+        prefix = "orgs"
         while True:
             res = self._request("GET", f"/{prefix}/{org}/repos?per_page=100&page={page}")
             if res is None:
-                if not is_user:
-                    return self.get_repos(org, is_user=True)
                 break
             if not res:
                 break

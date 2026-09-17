@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sqlite3
 from typing import List
 
 from src.adapters.base import BaseAdapter
@@ -43,7 +44,7 @@ class CodexSecurityAdapter(BaseAdapter):
             "--format", "json", 
             "--headless", 
             "--effort", "low", 
-            "--max-cost", "10.00"
+            "--max-cost", "5.00"
         ]
         
         # Scope scan paths to source directories to exclude node_modules from cost estimation
@@ -69,18 +70,48 @@ class CodexSecurityAdapter(BaseAdapter):
                 timeout=900  # 15 minutes max
             )
             
+            # Fetch actual token usage from the CLI's internal SQLite database
+            from src.core.models import AIUsage
+            ai_usage = AIUsage(usage_source="unavailable")
+            try:
+                db_path = os.path.join(codex_home, "state", "plugins", "codex-security", "workbench.sqlite3")
+                if os.path.exists(db_path):
+                    conn = sqlite3.connect(db_path)
+                    abs_repo_path = os.path.abspath(repo_path)
+                    cursor = conn.execute(
+                        "SELECT cost_json FROM scans WHERE target_path = ? OR target_path = ? ORDER BY created_at DESC LIMIT 1",
+                        (abs_repo_path, repo_path)
+                    )
+                    row = cursor.fetchone()
+                    conn.close()
+                    if row and row[0]:
+                        cost_data = json.loads(row[0])
+                        usage_dict = cost_data.get("usage", {})
+                        if "inputTokens" in usage_dict or "totalTokens" in usage_dict:
+                            ai_usage = AIUsage(
+                                input_tokens=usage_dict.get("inputTokens"),
+                                cached_tokens=usage_dict.get("cachedInputTokens"),
+                                output_tokens=usage_dict.get("outputTokens"),
+                                total_tokens=usage_dict.get("totalTokens"),
+                                estimated_cost=None,
+                                usage_source="cli-recorded"
+                            )
+            except Exception:
+                pass
+
             if result.returncode != 0:
                 err_out = (result.stderr or "").lower() + (result.stdout or "").lower()
                 # If access/auth fails, CLI usually returns a non-zero code and logs the error
                 if any(k in err_out for k in ["unauthorized", "forbidden", "access denied", "http 401", "http 403"]):
-                    return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message=f"Account lacks access (Auth error: {result.stderr.strip()[:100]})")
+                    return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message=f"Account lacks access (Auth error: {result.stderr.strip()[:100]})", ai_usage=ai_usage)
                 
                 stderr_summary = result.stderr.strip() if result.stderr and result.stderr.strip() else result.stdout.strip()
                 return ToolResult(
                     tool=self.tool_name,
                     status=ToolStatus.ERROR,
                     findings=[],
-                    error_message=f"CLI failed with code {result.returncode}. Stderr: {stderr_summary[-500:]}"
+                    error_message=f"CLI failed with code {result.returncode}. Stderr: {stderr_summary[-500:]}",
+                    ai_usage=ai_usage
                 )
                     
             try:
@@ -90,9 +121,9 @@ class CodexSecurityAdapter(BaseAdapter):
                     json_str = output[output.find("{"):]
                     data = json.loads(json_str)
                 else:
-                    return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message="No JSON output found")
+                    return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message="No JSON output found", ai_usage=ai_usage)
             except json.JSONDecodeError:
-                return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message=f"Failed to parse JSON. Output start: {result.stdout[:100]}")
+                return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message=f"Failed to parse JSON. Output start: {result.stdout[:100]}", ai_usage=ai_usage)
                 
             findings = []
             repo_findings = data.get("repositoryFindings", [])
@@ -135,7 +166,7 @@ class CodexSecurityAdapter(BaseAdapter):
                     code_context=snippet
                 ))
                 
-            return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=findings)
+            return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=findings, ai_usage=ai_usage)
             
         except subprocess.TimeoutExpired:
             return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message="Scan timed out after 15 minutes.")

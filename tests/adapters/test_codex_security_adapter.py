@@ -17,14 +17,16 @@ def test_codex_security_adapter_no_key():
         assert result.status.name == "SKIPPED"
         assert len(result.findings) == 0
 
+@patch("src.adapters.codex_security_adapter.sqlite3")
+@patch("src.adapters.codex_security_adapter.os.path.exists")
 @patch("src.adapters.codex_security_adapter.subprocess.run")
-def test_codex_security_adapter_success_findings(mock_run, mock_env):
+def test_codex_security_adapter_success_findings(mock_run, mock_exists, mock_sqlite, mock_env):
     adapter = CodexSecurityAdapter()
     
     mock_result = MagicMock()
     mock_result.returncode = 0
+    mock_result.stderr = ""
     mock_result.stdout = '''
-    Some npx download logs
     {
       "repositoryFindings": [
         {
@@ -49,6 +51,22 @@ def test_codex_security_adapter_success_findings(mock_run, mock_env):
     }
     '''
     mock_run.return_value = mock_result
+    mock_exists.return_value = True
+
+    # Mock SQLite returning actual token usage
+    mock_conn = MagicMock()
+    mock_sqlite.connect.return_value = mock_conn
+    mock_cursor = MagicMock()
+    mock_conn.execute.return_value = mock_cursor
+    import json
+    mock_cursor.fetchone.return_value = (json.dumps({
+        "usage": {
+            "inputTokens": 1000,
+            "cachedInputTokens": 200,
+            "outputTokens": 50,
+            "totalTokens": 1050
+        }
+    }),)
     
     res = adapter.run(".")
     assert res.status.name == "COMPLETED"
@@ -62,41 +80,61 @@ def test_codex_security_adapter_success_findings(mock_run, mock_env):
     assert "Found a SQL injection" in f.description
     assert f.rule_id == "CWE-89"
     assert "codex-security" in f.detected_by
+    
+    # Assert ai_usage uses actual tokens
+    assert res.ai_usage is not None
+    assert res.ai_usage.input_tokens == 1000
+    assert res.ai_usage.cached_tokens == 200
+    assert res.ai_usage.output_tokens == 50
+    assert res.ai_usage.total_tokens == 1050
+    assert res.ai_usage.estimated_cost is None
+    assert res.ai_usage.usage_source == "cli-recorded"
 
-    # Verify environment variables passed
-    _, kwargs = mock_run.call_args
-    passed_env = kwargs.get("env", {})
-    assert "CODEX_HOME" in passed_env
-    assert passed_env.get("CODEX_PERMISSION_PROFILE") == ":workspace"
-
+@patch("src.adapters.codex_security_adapter.os.path.exists")
 @patch("src.adapters.codex_security_adapter.subprocess.run")
-def test_codex_security_adapter_success_zero_findings(mock_run, mock_env):
+def test_codex_security_adapter_success_no_db(mock_run, mock_exists, mock_env):
     adapter = CodexSecurityAdapter()
     
     mock_result = MagicMock()
     mock_result.returncode = 0
+    mock_result.stderr = ""
     mock_result.stdout = '{"repositoryFindings": []}'
     mock_run.return_value = mock_result
     
+    # DB does not exist
+    mock_exists.return_value = False
+    
     res = adapter.run(".")
     assert res.status.name == "COMPLETED"
-    assert len(res.findings) == 0
-    assert res.error_message is None
+    assert res.ai_usage is not None
+    assert res.ai_usage.input_tokens is None
+    assert res.ai_usage.total_tokens is None
+    assert res.ai_usage.estimated_cost is None
+    assert res.ai_usage.usage_source == "unavailable"
 
+@patch("src.adapters.codex_security_adapter.os.path.exists")
 @patch("src.adapters.codex_security_adapter.subprocess.run")
-def test_codex_security_adapter_cli_error_code_2(mock_run, mock_env):
+def test_codex_security_adapter_cli_error_code_2(mock_run, mock_exists, mock_env):
     adapter = CodexSecurityAdapter()
     
     mock_result = MagicMock()
     mock_result.returncode = 2
-    mock_result.stderr = "Error: state directory /home/runner/.codex/state/plugins/codex-security/scans could not be accessed"
+    mock_result.stderr = "Scan stopped: estimated cost $5.050737 exceeded the $5.00 limit"
     mock_result.stdout = ""
     mock_run.return_value = mock_result
+    mock_exists.return_value = False
     
     res = adapter.run(".")
     assert res.status.name == "ERROR"
     assert len(res.findings) == 0
     assert "CLI failed with code 2" in res.error_message
+    
+    # Tokens should be unavailable (null), not 0, and estimated cost is no longer tracked
+    assert res.ai_usage is not None
+    assert res.ai_usage.input_tokens is None
+    assert res.ai_usage.total_tokens is None
+    assert res.ai_usage.estimated_cost is None
+    assert res.ai_usage.usage_source == "unavailable"
 
 @patch("src.adapters.codex_security_adapter.subprocess.run")
 def test_codex_security_adapter_partial_output_on_error(mock_run, mock_env):

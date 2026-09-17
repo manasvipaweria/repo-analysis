@@ -206,12 +206,23 @@ class TestMetrics:
     coverage_percent: Optional[float] = None
 
 @dataclass
+class AIUsage:
+    input_tokens: Optional[int] = None
+    cached_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    estimated_cost: Optional[float] = None
+    cost_currency: str = "USD"
+    usage_source: str = "unavailable"
+
+@dataclass
 class ToolResult:
     tool: str
     status: ToolStatus
     findings: List[Finding] = field(default_factory=list)
     metrics: Optional[TestMetrics] = None
     error_message: Optional[str] = None
+    ai_usage: Optional[AIUsage] = None
 
 @dataclass
 

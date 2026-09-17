@@ -333,6 +333,48 @@ def main():
                     print(f"      Error: {tool_summary['error_message']}")
                 if 'metrics' in tool_summary:
                     print(f"      Metrics: {tool_summary['metrics']}")
+
+        print("\n## AI USAGE\n")
+        
+        has_ai_usage = False
+        # Collect tool usages
+        for cat, summary in report.summary.items():
+            for tool, tool_summary in summary.tools.items():
+                if "ai_usage" in tool_summary:
+                    usage = tool_summary["ai_usage"]
+                    has_ai_usage = True
+                    print(f"{tool}:")
+                    inp = usage.get('input_tokens')
+                    out = usage.get('output_tokens')
+                    tot = usage.get('total_tokens')
+                    cch = usage.get('cached_tokens')
+                    cst = usage.get('estimated_cost')
+                    src = usage.get('usage_source')
+                    print(f"  Input tokens: {inp if inp is not None else 'unavailable'}")
+                    print(f"  Cached tokens: {cch if cch is not None else 'unavailable'}")
+                    print(f"  Output tokens: {out if out is not None else 'unavailable'}")
+                    print(f"  Total tokens: {tot if tot is not None else 'unavailable'}")
+                    if cst is not None:
+                        print(f"  Estimated cost: {cst}")
+                    print(f"  Source: {src if src is not None else 'unavailable'}\n")
+
+        # Also add Gemini AI Analysis usage which was returned by AIAdapter.run()
+        if args.run_ai and 'ai_result' in locals() and ai_result:
+            usage = ai_result.get('usage', {})
+            has_ai_usage = True
+            print("Gemini AI Analysis:")
+            inp = usage.get('input_tokens')
+            cch = usage.get('cached_tokens')
+            out = usage.get('output_tokens')
+            tot = usage.get('total_tokens')
+            print(f"  Input tokens: {inp if inp is not None else 'unavailable'}")
+            print(f"  Cached tokens: {cch if cch is not None else 'unavailable'}")
+            print(f"  Output tokens: {out if out is not None else 'unavailable'}")
+            print(f"  Total tokens: {tot if tot is not None else 'unavailable'}")
+            print(f"  Source: provider-reported\n")
+            
+        if not has_ai_usage:
+            print("No AI Usage data recorded.\n")
                     
     except Exception as e:
         print(f"Error during execution: {e}")
