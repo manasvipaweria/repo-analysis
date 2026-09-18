@@ -268,28 +268,19 @@ def test_deslint_finding_has_quality_category(tmp_path):
             assert len(result.findings) == 1
             assert result.findings[0].category == Category.QUALITY.value
 
-def test_deslint_react_dir_detection_skips_node_modules(tmp_path):
-    nm = tmp_path / "node_modules" / "some-pkg"
-    nm.mkdir(parents=True)
-    (nm / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
-    (tmp_path / "package.json").write_text('{"name": "root"}')
+def test_deslint_missing_supported_package_json(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "App.jsx").write_text("const a = 1;")
+    # Note: no package.json in tmp_path or tmp_path/frontend
 
     adapter = DeslintAdapter()
     with patch("subprocess.run") as mock_run:
         with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
-            mock_proc = MagicMock()
-            mock_proc.returncode = 2
-            mock_proc.stdout = ""
-            mock_proc.stderr = "Cannot find package '@deslint/eslint-plugin'"
-            mock_run.return_value = mock_proc
-
             result = adapter.run(str(tmp_path))
 
-            if mock_run.called:
-                cwd = mock_run.call_args.kwargs.get("cwd") or mock_run.call_args[1].get("cwd", "")
-                assert "node_modules" not in str(cwd), "Config must never be written inside node_modules"
-
-            assert result.status in (ToolStatus.ERROR, ToolStatus.SKIPPED)
+            assert result.status == ToolStatus.SKIPPED
+            assert "No supported package.json found" in result.error_message
+            assert not mock_run.called
 
 def test_deslint_nested_frontend_path_no_duplication(tmp_path):
     frontend_dir = tmp_path / "frontend"

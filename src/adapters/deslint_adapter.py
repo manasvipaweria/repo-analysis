@@ -166,21 +166,21 @@ export default [
         from pathlib import Path
 
         repo_dir = Path(repo_path).resolve()
-        frontend_dir = repo_dir
-
-        for root_dir, dirs, files in os.walk(repo_dir):
-            if 'node_modules' in dirs:
-                dirs.remove('node_modules')
-            if 'package.json' in files:
-                try:
-                    with open(Path(root_dir) / 'package.json', 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                        deps = {**data.get('dependencies', {}), **data.get('devDependencies', {})}
-                        if 'react' in deps or 'react-dom' in deps:
-                            frontend_dir = Path(root_dir).resolve()
-                            break
-                except Exception:
-                    pass
+        
+        # Determine the correct frontend directory
+        root_pkg = repo_dir / 'package.json'
+        frontend_pkg = repo_dir / 'frontend' / 'package.json'
+        
+        if root_pkg.exists():
+            frontend_dir = repo_dir
+        elif frontend_pkg.exists():
+            frontend_dir = repo_dir / 'frontend'
+        else:
+            return ToolResult(
+                tool=self.tool_name,
+                status=ToolStatus.SKIPPED,
+                error_message="No supported package.json found in repository root or frontend/ directory."
+            )
 
         config_path = frontend_dir / ".deslint.config.mjs"
         
@@ -215,7 +215,7 @@ export default [
             
             if not plugin_pkg_path.exists() and not parent_plugin_pkg_path.exists():
                 subprocess.run(
-                    "npm install @deslint/eslint-plugin eslint --save-dev --no-fund --no-audit",
+                    "npm install @deslint/eslint-plugin eslint --no-save --no-fund --no-audit",
                     cwd=str(frontend_dir),
                     env=env,
                     shell=True,
