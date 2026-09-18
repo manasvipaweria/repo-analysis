@@ -154,8 +154,27 @@ class CodexArchitectureAdapter(BaseAdapter):
                     detected_by=[self.tool_name],
                     code_context=context_str
                 ))
+            
+            ai_usage = None
+            if hasattr(response, 'usage') and response.usage:
+                from src.core.models import AIUsage
+                u = response.usage
                 
-            return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=findings)
+                # Check cached tokens if exposed
+                cached = None
+                if hasattr(u, 'prompt_tokens_details') and u.prompt_tokens_details:
+                    cached = getattr(u.prompt_tokens_details, 'cached_tokens', None)
+                    
+                ai_usage = AIUsage(
+                    input_tokens=getattr(u, 'prompt_tokens', None),
+                    cached_tokens=cached,
+                    output_tokens=getattr(u, 'completion_tokens', None),
+                    total_tokens=getattr(u, 'total_tokens', None),
+                    estimated_cost=None,
+                    usage_source="provider-reported"
+                )
+                
+            return ToolResult(tool=self.tool_name, status=ToolStatus.COMPLETED, findings=findings, ai_usage=ai_usage)
             
         except Exception as e:
             return ToolResult(tool=self.tool_name, status=ToolStatus.ERROR, findings=[], error_message=f"Unexpected error during API call: {e}")

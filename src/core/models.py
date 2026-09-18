@@ -2,6 +2,11 @@ from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
+class GroupConfidence(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
 class Severity(str, Enum):
     CRITICAL = "critical"
     HIGH = "high"
@@ -102,6 +107,16 @@ class Finding:
     spdi_references: Optional[List[str]] = None
     # TCPA specific fields
     tcpa_references: Optional[List[str]] = None
+    # TRAI / DLT specific fields
+    trai_dlt_references: Optional[List[str]] = None
+    # ePrivacy specific fields
+    eprivacy_references: Optional[List[str]] = None
+    # Fingerprint identity
+    fingerprint: Optional[str] = None
+    group_id: Optional[str] = None
+    priority_score: Optional[int] = None
+    priority_level: Optional[str] = None
+    priority_reasons: List[str] = field(default_factory=list)
     
     def __init__(
         self, category: str, severity: str, file: Optional[str], line: Optional[int], 
@@ -126,6 +141,13 @@ class Finding:
         cert_in_references: Optional[List[str]] = None,
         spdi_references: Optional[List[str]] = None,
         tcpa_references: Optional[List[str]] = None,
+        trai_dlt_references: Optional[List[str]] = None,
+        eprivacy_references: Optional[List[str]] = None,
+        fingerprint: Optional[str] = None,
+        group_id: Optional[str] = None,
+        priority_score: Optional[int] = None,
+        priority_level: Optional[str] = None,
+        priority_reasons: Optional[List[str]] = None
     ):
         self.finding_id = finding_id or str(uuid.uuid4())
         self.status = status
@@ -168,6 +190,13 @@ class Finding:
         self.cert_in_references = cert_in_references or []
         self.spdi_references = spdi_references or []
         self.tcpa_references = tcpa_references or []
+        self.trai_dlt_references = trai_dlt_references or []
+        self.eprivacy_references = eprivacy_references or []
+        self.fingerprint = fingerprint
+        self.group_id = group_id
+        self.priority_score = priority_score
+        self.priority_level = priority_level
+        self.priority_reasons = priority_reasons or []
 
 @dataclass
 class TestMetrics:
@@ -177,12 +206,36 @@ class TestMetrics:
     coverage_percent: Optional[float] = None
 
 @dataclass
+class AIUsage:
+    input_tokens: Optional[int] = None
+    cached_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    total_tokens: Optional[int] = None
+    estimated_cost: Optional[float] = None
+    cost_currency: str = "USD"
+    usage_source: str = "unavailable"
+
+@dataclass
 class ToolResult:
     tool: str
     status: ToolStatus
     findings: List[Finding] = field(default_factory=list)
     metrics: Optional[TestMetrics] = None
     error_message: Optional[str] = None
+    ai_usage: Optional[AIUsage] = None
+
+@dataclass
+
+@dataclass
+class FindingGroup:
+    group_id: str
+    title: str
+    confidence: GroupConfidence
+    grouping_reason: str
+    fingerprints: List[str] = field(default_factory=list)
+    category: Optional[str] = None
+    severity: Optional[str] = None
+    rule_id: Optional[str] = None
 
 @dataclass
 class CategorySummary:
@@ -198,6 +251,7 @@ class Report:
     summary: Dict[str, CategorySummary] = field(default_factory=dict)
     findings: List[Finding] = field(default_factory=list)
     data_flow: Optional[Dict[str, Any]] = None
+    finding_groups: List[FindingGroup] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         import dataclasses
@@ -267,16 +321,37 @@ class Report:
                 cert_in_references=fd.get("cert_in_references", []),
                 spdi_references=fd.get("spdi_references", []),
                 tcpa_references=fd.get("tcpa_references", []),
+                trai_dlt_references=fd.get("trai_dlt_references", []),
+                eprivacy_references=fd.get("eprivacy_references", []),
+                fingerprint=fd.get("fingerprint"),
+                group_id=fd.get("group_id"),
+                priority_score=fd.get("priority_score"),
+                priority_level=fd.get("priority_level"),
+                priority_reasons=fd.get("priority_reasons", []),
                 file=None,  # Legacy args
                 line=None,
                 message=""
             )
             findings_list.append(f)
             
+        groups_list = []
+        for gd in data.get("finding_groups", []):
+            groups_list.append(FindingGroup(
+                group_id=gd.get("group_id", ""),
+                title=gd.get("title", ""),
+                confidence=GroupConfidence(gd.get("confidence", "LOW")),
+                grouping_reason=gd.get("grouping_reason", ""),
+                fingerprints=gd.get("fingerprints", []),
+                category=gd.get("category"),
+                severity=gd.get("severity"),
+                rule_id=gd.get("rule_id")
+            ))
+
         return cls(
             repo=data.get("repo", ""),
             timestamp=data.get("timestamp", ""),
             summary=summary_dict,
             findings=findings_list,
-            data_flow=data.get("data_flow")
+            data_flow=data.get("data_flow"),
+            finding_groups=groups_list
         )

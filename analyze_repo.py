@@ -54,6 +54,8 @@ def main():
     )
     parser.add_argument("--output", help="Comma-separated list of outputs (json,csv)", default="json,csv")
     parser.add_argument("--run-ai", action="store_true", help="Run the AI analysis stage after scanner execution")
+    parser.add_argument("--revalidate", help="Revalidate a specific finding by its fingerprint")
+    parser.add_argument("--report-file", help="Path to existing JSON report to find the original finding", default="report.json")
     
     args = parser.parse_args()
     
@@ -77,6 +79,40 @@ def main():
             repo_path = clone_repo(args.repo_url, args.branch)
             cleanup = True
             print(f"[*] Cloned to {repo_path}")
+            
+        if args.revalidate:
+            print(f"[*] Starting revalidation for fingerprint: {args.revalidate}")
+            import json
+            from src.core.models import Report, Finding
+            from src.core.revalidation import revalidate_finding
+            
+            if not os.path.exists(args.report_file):
+                print(f"[-] Error: Report file {args.report_file} not found.")
+                sys.exit(1)
+                
+            with open(args.report_file, 'r', encoding='utf-8') as f:
+                report_data = json.load(f)
+                
+            original_report = Report.from_dict(report_data)
+            
+            target_finding = next((f for f in original_report.findings if getattr(f, 'fingerprint', None) == args.revalidate), None)
+            if not target_finding:
+                print(f"[-] Error: Finding with fingerprint {args.revalidate} not found in {args.report_file}")
+                sys.exit(1)
+                
+            print(f"[*] Original finding identified from {', '.join(target_finding.detected_by)}")
+            result = revalidate_finding(target_finding, repo_path, ALL_ADAPTERS)
+            
+            print(f"\n--- Revalidation Result ---")
+            print(f"Fingerprint: {result.fingerprint}")
+            print(f"Status:      {result.status.value}")
+            print(f"Tool(s) run: {result.tool}")
+            print(f"Message:     {result.message}")
+            if result.current_finding:
+                print(f"Found at:    {result.current_finding.location.file}:{result.current_finding.location.line}")
+            print("---------------------------")
+            
+            sys.exit(0)
             
         orchestrator = Orchestrator(adapters=adapters)
         
@@ -243,6 +279,52 @@ def main():
             print(f"US TCPA Technical Readiness: Execution Error ({e})")
             print("------------------------")
 
+        # TRAI / DLT summary section
+        try:
+            from src.compliance.trai_dlt_engine import evaluate_trai_dlt_applicability
+            trai_eval = evaluate_trai_dlt_applicability(repo_path, report.data_flow)
+            trai_findings = [f for f in report.findings if getattr(f, 'framework', None) == "TRAI_DLT" or (getattr(f, 'trai_dlt_references', None) and len(f.trai_dlt_references) > 0)]
+            
+            pe_items = [f for f in trai_findings if any("REG-PE-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            hdr_items = [f for f in trai_findings if any("REG-HEADER-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            tpl_items = [f for f in trai_findings if any("REG-TEMPLATE-ID" in r for r in getattr(f, 'trai_dlt_references', []))]
+            promo_items = [f for f in trai_findings if any("PROMOTIONAL" in r or "PREFERENCE-DND" in r for r in getattr(f, 'trai_dlt_references', []))]
+            trai_attestations = [f for f in trai_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED]
+            
+            print(f"India TRAI / TCCCPR / DLT Technical Readiness:")
+            print(f"  - Applicability State: {trai_eval['status']} ({trai_eval['evaluation_method']})")
+            print(f"  - Principal Entity (PE) ID Evidence: {len(pe_items)}")
+            print(f"  - Sender Header ID Evidence: {len(hdr_items)}")
+            print(f"  - Content Template ID Evidence: {len(tpl_items)}")
+            print(f"  - Promotional Controls / DND Evidence: {len(promo_items)}")
+            print(f"  - Organizational Attestations Required: {len(trai_attestations)} checklist items")
+            print("------------------------")
+        except Exception as e:
+            print(f"India TRAI / TCCCPR / DLT Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
+        # ePrivacy summary section
+        try:
+            from src.compliance.eprivacy_engine import evaluate_eprivacy_applicability
+            eprivacy_app, eprivacy_reasons, eprivacy_src = evaluate_eprivacy_applicability(repo_path)
+            eprivacy_findings = [f for f in report.findings if getattr(f, 'framework', None) == "EPRIVACY" or (getattr(f, 'eprivacy_references', None) and len(f.eprivacy_references) > 0)]
+            
+            terminal_items = [f for f in eprivacy_findings if any("ART5-3-TERMINAL" in r for r in getattr(f, 'eprivacy_references', []))]
+            traffic_items = [f for f in eprivacy_findings if any("ART6-TRAFFIC" in r for r in getattr(f, 'eprivacy_references', []))]
+            marketing_items = [f for f in eprivacy_findings if any("ART13-DIRECT-MARKETING" in r for r in getattr(f, 'eprivacy_references', []))]
+            eprivacy_attestations = [f for f in eprivacy_findings if getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.ATTESTATION_REQUIRED or getattr(f, 'compliance_finding_type', None) == ComplianceFindingType.HUMAN_REVIEW]
+            
+            print(f"EU ePrivacy Directive Technical Readiness:")
+            print(f"  - Applicability State: {eprivacy_app} ({eprivacy_src})")
+            print(f"  - Article 5(3) Terminal Equipment Evidence: {len(terminal_items)}")
+            print(f"  - Article 6 Traffic Data Evidence: {len(traffic_items)}")
+            print(f"  - Article 13 Direct Marketing Evidence: {len(marketing_items)}")
+            print(f"  - Human Review / Attestations Required: {len(eprivacy_attestations)} items")
+            print("------------------------")
+        except Exception as e:
+            print(f"EU ePrivacy Directive Technical Readiness: Execution Error ({e})")
+            print("------------------------")
+
         for cat, summary in report.summary.items():
             print(f"{cat.upper()}: {summary.status.value} ({summary.count} findings)")
             for tool, tool_summary in summary.tools.items():
@@ -251,6 +333,48 @@ def main():
                     print(f"      Error: {tool_summary['error_message']}")
                 if 'metrics' in tool_summary:
                     print(f"      Metrics: {tool_summary['metrics']}")
+
+        print("\n## AI USAGE\n")
+        
+        has_ai_usage = False
+        # Collect tool usages
+        for cat, summary in report.summary.items():
+            for tool, tool_summary in summary.tools.items():
+                if "ai_usage" in tool_summary:
+                    usage = tool_summary["ai_usage"]
+                    has_ai_usage = True
+                    print(f"{tool}:")
+                    inp = usage.get('input_tokens')
+                    out = usage.get('output_tokens')
+                    tot = usage.get('total_tokens')
+                    cch = usage.get('cached_tokens')
+                    cst = usage.get('estimated_cost')
+                    src = usage.get('usage_source')
+                    print(f"  Input tokens: {inp if inp is not None else 'unavailable'}")
+                    print(f"  Cached tokens: {cch if cch is not None else 'unavailable'}")
+                    print(f"  Output tokens: {out if out is not None else 'unavailable'}")
+                    print(f"  Total tokens: {tot if tot is not None else 'unavailable'}")
+                    if cst is not None:
+                        print(f"  Estimated cost: {cst}")
+                    print(f"  Source: {src if src is not None else 'unavailable'}\n")
+
+        # Also add Gemini AI Analysis usage which was returned by AIAdapter.run()
+        if args.run_ai and 'ai_result' in locals() and ai_result:
+            usage = ai_result.get('usage', {})
+            has_ai_usage = True
+            print("Gemini AI Analysis:")
+            inp = usage.get('input_tokens')
+            cch = usage.get('cached_tokens')
+            out = usage.get('output_tokens')
+            tot = usage.get('total_tokens')
+            print(f"  Input tokens: {inp if inp is not None else 'unavailable'}")
+            print(f"  Cached tokens: {cch if cch is not None else 'unavailable'}")
+            print(f"  Output tokens: {out if out is not None else 'unavailable'}")
+            print(f"  Total tokens: {tot if tot is not None else 'unavailable'}")
+            print(f"  Source: provider-reported\n")
+            
+        if not has_ai_usage:
+            print("No AI Usage data recorded.\n")
                     
     except Exception as e:
         print(f"Error during execution: {e}")

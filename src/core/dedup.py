@@ -18,6 +18,10 @@ def jaccard_similarity(set1: set, set2: set) -> float:
     return intersection / union if union > 0 else 0.0
 
 def is_duplicate(f1: Finding, f2: Finding) -> bool:
+    if getattr(f1, 'fingerprint', None) and getattr(f2, 'fingerprint', None):
+        if f1.fingerprint == f2.fingerprint:
+            return True
+
     f1_file = f1.location.file if f1.location else None
     f2_file = f2.location.file if f2.location else None
     f1_line = f1.location.line if f1.location else None
@@ -51,13 +55,16 @@ def is_duplicate(f1: Finding, f2: Finding) -> bool:
         
     return False
 
-def deduplicate_findings(findings: List[Finding]) -> List[Finding]:
+def deduplicate_findings(findings: List[Finding], repo_path: str = None) -> List[Finding]:
     """
     Conservatively deduplicates findings across different tools.
     Multiple tools may identify the same underlying issue.
     We only merge if file, line, category match AND we have strong confidence
     (matching rule ID or high message similarity).
     """
+    from src.core.fingerprinting import assign_fingerprints
+    assign_fingerprints(findings, repo_path)
+    
     deduped: List[Finding] = []
     
     for f in findings:

@@ -1,0 +1,15 @@
+{
+  "vendors": [
+    {
+      "name": "Twilio",
+      "category": "communications",
+      "status": "APPROVED",
+      "identifiers": [
+        "twilio.com",
+        "api.twilio.com",
+        "twilio",
+        "@twilio"
+      ]
+    }
+  ]
+}

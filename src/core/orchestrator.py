@@ -20,6 +20,21 @@ class Orchestrator:
         for adapter in self.adapters:
             try:
                 result = adapter.run(repo_path)
+                if getattr(result, 'ai_usage', None):
+                    u = result.ai_usage
+                    tool = result.tool
+                    source = u.usage_source
+                    inp = u.input_tokens
+                    out = u.output_tokens
+                    tot = u.total_tokens
+                    cached = u.cached_tokens
+                    cost = u.estimated_cost
+                    
+                    if source == "unavailable" and cost is not None:
+                        print(f"[{tool}] AI Token Usage - unavailable; CLI reported estimated cost: ${cost:.2f}")
+                    else:
+                        cost_str = f"${cost:.2f}" if cost is not None else "N/A"
+                        print(f"[{tool}] AI Token Usage - Input: {inp} | Cached: {cached} | Output: {out} | Total: {tot} | Estimated Cost: {cost_str} | Source: {source}")
             except Exception as e:
                 # Fallback if adapter completely crashes
                 result = ToolResult(
@@ -37,7 +52,7 @@ class Orchestrator:
             if result.findings:
                 all_findings.extend(result.findings)
                 
-        deduped_findings = deduplicate_findings(all_findings)
+        deduped_findings = deduplicate_findings(all_findings, repo_path)
         
         # Phase 1, 2, 3: Shared Data Flow Extraction and Deterministic GDPR Checks
         try:
@@ -159,6 +174,9 @@ class Orchestrator:
                 
             seen_processors = set()
             
+            from src.compliance.vendor_registry import get_vendor_registry
+            registry = get_vendor_registry(repo_path)
+            
             for (proc, field), tx_list in tp_map.items():
                 rule_id = "third-party-transfer"
                 
@@ -183,28 +201,39 @@ class Orchestrator:
                     gdpr_references=["Art. 28", "Art. 44-49"],
                     code_context="International-transfer applicability could not be determined from source code."
                 )
+                
+                vendor_match = registry.is_approved_vendor(proc)
+                if vendor_match.status == "NOT_FOUND":
+                    finding.compliance_finding_type = ComplianceFindingType.HUMAN_REVIEW
+                    finding.priority = "P2"
+                    if finding.severity in ("info", "low"):
+                        finding.severity = "medium"
+                    finding.message = f"UNRECOGNIZED_THIRD_PARTY: Personal data '{field}' is transmitted to an unvetted/unknown processor/service ({proc})."
+                    finding.title = "GDPR: third-party-transfer (Unrecognized Vendor)"
+                    
                 deduped_findings.append(finding)
                 
                 # Human review for 3rd party
                 if proc not in seen_processors:
                     seen_processors.add(proc)
-                    deduped_findings.append(Finding(
-                        category=Category.PRIVACY.value,
-                        severity="info",
-                        file=tx_list[0]["file"],
-                        line=tx_list[0]["line"],
-                        message=f"Third party processor ({proc}) requires legal review for lawful basis, transparency, and processor-agreement adequacy.",
-                        rule_id="human-review-processor",
-                        finding_id=str(uuid.uuid4()),
-                        status="OPEN",
-                        priority="P3",
-                        title="GDPR: human-review-processor",
-                        evidence=FindingEvidence(code_context=proc),
-                        detected_by=["data-flow-extractor"],
-                        merge_blocking=False,
-                        compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
-                        code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
-                    ))
+                    if vendor_match.status == "APPROVED":
+                        deduped_findings.append(Finding(
+                            category=Category.PRIVACY.value,
+                            severity="info",
+                            file=tx_list[0]["file"],
+                            line=tx_list[0]["line"],
+                            message=f"Third party processor ({proc}) requires legal review for lawful basis, transparency, and processor-agreement adequacy.",
+                            rule_id="human-review-processor",
+                            finding_id=str(uuid.uuid4()),
+                            status="OPEN",
+                            priority="P3",
+                            title="GDPR: human-review-processor",
+                            evidence=FindingEvidence(code_context=proc),
+                            detected_by=["data-flow-extractor"],
+                            merge_blocking=False,
+                            compliance_finding_type=ComplianceFindingType.HUMAN_REVIEW,
+                            code_context=REQUIREMENTS.get("HR_THIRD_PARTY", "")
+                        ))
                     
                     if proc in ["twilio", "sendgrid", "wrapper[sendMessageToRecipients]", "wrapper[sendNotification]", "wrapper[sendOne]", "wrapper[sendWhatsAppViaMeta]"]:
                         deduped_findings.append(Finding(
@@ -288,13 +317,36 @@ class Orchestrator:
             except Exception as e:
                 print(f"SPDI engine execution error: {e}")
 
+            # Shared Communication Channel Classifier
+            try:
+                from src.compliance.communication_classifier import classify_communications
+                comm_evidence = classify_communications(repo_path, flow_data)
+            except Exception as e:
+                print(f"Communication classifier execution error: {e}")
+                comm_evidence = None
+
             # US TCPA (Telephone Consumer Protection Act) Engine Checks
             try:
                 from src.compliance.tcpa_engine import run_tcpa_checks
-                tcpa_summary, tcpa_findings = run_tcpa_checks(repo_path, flow_data, deduped_findings)
+                tcpa_summary, tcpa_findings = run_tcpa_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
                 deduped_findings.extend(tcpa_findings)
             except Exception as e:
                 print(f"TCPA engine execution error: {e}")
+
+            try:
+                from src.compliance.trai_dlt_engine import run_trai_dlt_checks
+                trai_dlt_findings = run_trai_dlt_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
+                deduped_findings.extend(trai_dlt_findings)
+            except Exception as e:
+                print(f"TRAI/DLT engine execution error: {e}")
+
+            # EU ePrivacy Directive Checks
+            try:
+                from src.compliance.eprivacy_engine import run_eprivacy_checks
+                eprivacy_summary, eprivacy_findings = run_eprivacy_checks(repo_path, flow_data, deduped_findings, comm_evidence=comm_evidence)
+                deduped_findings.extend(eprivacy_findings)
+            except Exception as e:
+                print(f"ePrivacy engine execution error: {e}")
 
         except Exception as e:
             print(f"Compliance extraction error: {e}")
@@ -364,6 +416,10 @@ class Orchestrator:
                     }
                 if r.error_message:
                     tool_dict["error_message"] = r.error_message
+                if getattr(r, 'ai_usage', None):
+                    import dataclasses
+                    # Convert AIUsage to dict natively, handling Enums if any.
+                    tool_dict["ai_usage"] = dataclasses.asdict(r.ai_usage)
                     
                 tool_summaries[r.tool] = tool_dict
                 
@@ -373,17 +429,27 @@ class Orchestrator:
                 tools=tool_summaries
             )
             
+        from src.core.finding_grouping import group_findings
+        from src.core.finding_prioritization import prioritize_findings
+
+        finding_groups, grouped_findings = group_findings(deduped_findings)
+        prioritized_findings = prioritize_findings(grouped_findings, finding_groups)
+            
         report = Report(
             repo=repo_url,
             timestamp=timestamp,
             summary=summary,
-            findings=deduped_findings,
-            data_flow=flow_data if 'flow_data' in locals() else None
+            findings=prioritized_findings,
+            data_flow=flow_data if 'flow_data' in locals() else None,
+            finding_groups=finding_groups
         )
         return report
 
     def enrich_findings(self, findings: List[Finding], repo_path: str):
         import os
+        from src.core.fingerprinting import assign_fingerprints
+        assign_fingerprints(findings, repo_path)
+        
         for f in findings:
             # Code Context
             file_path = f.location.file if f.location else None
@@ -453,6 +519,22 @@ class Orchestrator:
                 existing_tcpa = set(f.tcpa_references or [])
                 existing_tcpa.update(tcpa_refs)
                 f.tcpa_references = sorted(list(existing_tcpa))
+
+            # TRAI / DLT Mapping
+            from src.compliance.trai_dlt_mapping import get_trai_dlt_references_for_rule
+            trai_refs = get_trai_dlt_references_for_rule(f.rule_id, f.detected_by)
+            if trai_refs:
+                existing_trai = set(f.trai_dlt_references or [])
+                existing_trai.update(trai_refs)
+                f.trai_dlt_references = sorted(list(existing_trai))
+
+            # ePrivacy Mapping
+            from src.compliance.eprivacy_mapping import get_eprivacy_references_for_rule
+            eprivacy_refs = get_eprivacy_references_for_rule(f.rule_id, f.detected_by)
+            if eprivacy_refs:
+                existing_eprivacy = set(f.eprivacy_references or [])
+                existing_eprivacy.update(eprivacy_refs)
+                f.eprivacy_references = sorted(list(existing_eprivacy))
 
             # Compliance Manager Questions Enrichment
             from src.compliance.requirement_text import get_finding_spec
