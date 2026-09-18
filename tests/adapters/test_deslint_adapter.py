@@ -320,3 +320,30 @@ def test_deslint_nested_frontend_path_no_duplication(tmp_path):
 
 
 
+
+def test_deslint_root_takes_precedence_over_frontend(tmp_path):
+    (tmp_path / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    (tmp_path / "node_modules" / "@deslint" / "eslint-plugin").mkdir(parents=True, exist_ok=True)
+    frontend_dir = tmp_path / "frontend"
+    frontend_dir.mkdir(parents=True)
+    (frontend_dir / "package.json").write_text('{"dependencies": {"react": "18.0.0"}}')
+    
+    adapter = DeslintAdapter()
+    with patch("subprocess.run") as mock_run:
+        with patch.dict(os.environ, {"ENABLE_DESLINT": "true"}, clear=True):
+            mock_install = MagicMock()
+            mock_install.returncode = 0
+            
+            mock_proc = MagicMock()
+            mock_proc.returncode = 0
+            mock_proc.stdout = "[]"
+            mock_run.side_effect = [mock_install, mock_proc]
+            
+            result = adapter.run(str(tmp_path))
+            print(result.error_message)
+            assert result.status == ToolStatus.COMPLETED
+            
+            assert mock_run.call_count == 2
+            for call in mock_run.call_args_list:
+                cwd = call.kwargs.get("cwd") or call[1].get("cwd")
+                assert cwd == str(tmp_path.resolve())
