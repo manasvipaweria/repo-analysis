@@ -10,7 +10,7 @@ on:
         default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor,apnimandi-design'
       enable_codex:
         description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
-        required: true 
+        required: false
         type: boolean
         default: false
       enable_design_ai:
@@ -20,7 +20,7 @@ on:
         default: true
       enable_deslint:
         description: 'Enable Deslint React UI Consistency analysis'
-        required: true 
+        required: false
         type: boolean
         default: false
       orchestrator_ref:
