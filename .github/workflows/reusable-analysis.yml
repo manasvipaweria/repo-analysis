@@ -12,7 +12,7 @@ on:
         description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
         required: false
         type: boolean
-        default: false
+        default: true
       enable_design_ai:
         description: 'Enable AI Semantic Design Checks for frontend repos'
         required: false
@@ -22,7 +22,7 @@ on:
         description: 'Enable Deslint React UI Consistency analysis'
         required: false
         type: boolean
-        default: false
+        default: true
       orchestrator_ref:
         description: 'Branch or tag of the orchestrator repository to use'
         required: false

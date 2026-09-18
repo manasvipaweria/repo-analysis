@@ -11,7 +11,11 @@ def mock_client():
 def test_generate_template():
     content = generate_template("v1")
     assert "uses: manasvipaweria/repo-analysis/.github/workflows/reusable-analysis.yml@v1" in content
+    assert "enable_codex: true" in content
+    assert "enable_deslint: true" in content
+    assert "enable_design_ai: true" in content
     assert "${{ secrets.SNYK_TOKEN }}" in content
+    assert "${{ secrets.OPENAI_API_KEY }}" in content
 
 def test_get_repos_pagination(mock_client):
     # Mock pagination logic

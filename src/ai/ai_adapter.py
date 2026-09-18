@@ -110,7 +110,9 @@ class AIAdapter:
             if response["status"] != "COMPLETED":
                 # Check for quota or limits
                 err_str = str(response.get("error_message", "")).lower()
-                if "429" in err_str or "quota" in err_str or "rate limit" in err_str:
+                if response.get("status") == "SKIPPED":
+                    final_status = "SKIPPED"
+                elif "429" in err_str or "quota" in err_str or "rate limit" in err_str:
                     final_status = "QUOTA_LIMIT_REACHED"
                 else:
                     final_status = "ERROR"

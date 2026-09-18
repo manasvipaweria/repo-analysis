@@ -72,7 +72,7 @@ class CodexArchitectureAdapter(BaseAdapter):
     def run(self, repo_path: str) -> ToolResult:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message="OPENAI_API_KEY not set")
+            return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message="OPENAI_API_KEY not configured")
             
         if openai is None:
             return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message="'openai' Python package not installed")

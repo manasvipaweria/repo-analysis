@@ -21,9 +21,14 @@ on:
 jobs:
   analysis:
     uses: manasvipaweria/repo-analysis/.github/workflows/reusable-analysis.yml@{orchestrator_ref}
+    with:
+      enable_codex: true
+      enable_design_ai: true
+      enable_deslint: true
     secrets:
       SNYK_TOKEN: ${{{{ secrets.SNYK_TOKEN }}}}
       GEMINI_API_KEY: ${{{{ secrets.GEMINI_API_KEY }}}}
+      OPENAI_API_KEY: ${{{{ secrets.OPENAI_API_KEY }}}}
 """
 
 class GitHubClient:

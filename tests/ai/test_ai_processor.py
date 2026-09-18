@@ -172,7 +172,7 @@ def test_gemini_missing_credentials(tmp_path, monkeypatch):
     adapter = AIAdapter()
     result = adapter.run(str(ai_input), str(report_file))
     
-    assert result["status"] == "ERROR"
+    assert result["status"] == "SKIPPED"
     assert "GEMINI_API_KEY not set" in result["error_message"]
 
 

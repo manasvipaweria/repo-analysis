@@ -1,142 +1,872 @@
 {
-  "repository": "../test-fixture",
-  "analysis_timestamp": "2026-09-08T14:36:27.539441+00:00",
+  "repository": ".",
+  "analysis_timestamp": "2026-09-17T12:30:02.033166+00:00",
   "findings": [
     {
-      "finding_id": "0a01fe5c-1b8c-4445-81a9-c8ab9acf0931",
+      "finding_id": "bb908ef6-227c-4cc7-88b7-8524f73b5b8b",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a73 \u2014 Applicability",
+      "file": null,
+      "rule_id": "dpdp-3-applicability",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Digital personal data processing detected. Verify whether data principals are located in India or services target individuals in India."
+    },
+    {
+      "finding_id": "d72e55e0-3230-4750-a34d-2ac5b29ee3cb",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a75 \u2014 Notice Requirements",
+      "file": null,
+      "rule_id": "dpdp-5-notice-requirements",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Verify that consent requests present an itemised notice detailing data fields, purpose, withdrawal under \u00a76(4), Data Principal rights (\u00a7\u00a711\u201314), and Board grievance procedures."
+    },
+    {
+      "finding_id": "d43f403e-f615-40e8-8ed6-2e34010debef",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a76(9) \u2014 Consent Manager Registration",
+      "file": null,
+      "rule_id": "dpdp-6-9-consent-manager",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Consent Managers used to manage Data Principal consent must be registered with the Data Protection Board. (Tier 2 requirement effective 13 Nov 2026)."
+    },
+    {
+      "finding_id": "97738b3f-4468-4d83-8b37-fb5b86c088a0",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a78(3) \u2014 Accuracy and Completeness",
+      "file": null,
+      "rule_id": "dpdp-8-3-accuracy",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Verify that personal data used to make decisions affecting individuals or shared onward is accurate, complete, and consistent."
+    },
+    {
+      "finding_id": "16a29362-ead1-414e-aeb9-986bd112fc13",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a78(6) \u2014 Personal Data Breach Notification",
+      "file": null,
+      "rule_id": "dpdp-8-6-breach-notification",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Verify technical logging, alerting, and incident response readiness to notify BOTH the Data Protection Board and ALL affected Data Principals in the event of a personal data breach. Note: DPDP \u00a78(6) does not contain a GDPR-style high-risk severity gate."
+    },
+    {
+      "finding_id": "78360c6f-5e62-44b4-a08a-74316f213dc7",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a78(9) \u2014 Designated Contact / Privacy Information",
+      "file": null,
+      "rule_id": "dpdp-8-9-designated-contact",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Designated contact / applicable DPO information could not be technically established from repository evidence under DPDP \u00a78(9)."
+    },
+    {
+      "finding_id": "5e645d1f-2c15-4d9f-a8be-f8e2b1b27a8f",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a78(10) \u2014 Grievance Redressal Mechanism",
+      "file": null,
+      "rule_id": "dpdp-8-10-grievance-mechanism",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Data Fiduciaries must provide an easily accessible grievance submission mechanism for Data Principals."
+    },
+    {
+      "finding_id": "e5cfda0e-4d51-4e01-83fa-a1468b9f90a0",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a79 \u2014 Processing of Children's & Disabled Persons' Data",
+      "file": null,
+      "rule_id": "dpdp-9-childrens-data-regime",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "DPDP \u00a79 establishes a distinct children's data regime requiring verifiable parental consent before processing data of minors (<18), prohibiting harmful processing, and banning behavioral tracking or targeted advertising."
+    },
+    {
+      "finding_id": "c7b72840-e754-42d8-9a97-932fb4cb2163",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a710 \u2014 Significant Data Fiduciary (SDF) Obligations",
+      "file": null,
+      "rule_id": "dpdp-10-significant-data-fiduciary",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "SDF applicability is a government notification threshold based on processing volume, sensitivity, and risk. Scanner cannot auto-determine SDF status."
+    },
+    {
+      "finding_id": "3ecbe615-7ea5-4a0b-9bda-162bdb15f354",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a714 \u2014 Right to Nominate",
+      "file": null,
+      "rule_id": "dpdp-14-right-to-nominate",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "DPDP \u00a714 grants Data Principals the right to nominate an individual to exercise rights on their death/incapacity. (DPDP-specific requirement with no direct GDPR analog)."
+    },
+    {
+      "finding_id": "18d686dd-7e40-416a-836b-a30fe57b2a4b",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "DPDP \u00a716 \u2014 Cross-Border Data Transfer",
+      "file": null,
+      "rule_id": "dpdp-16-restricted-countries-config",
+      "detected_by": [
+        "dpdp-engine"
+      ],
+      "merge_blocking": false,
+      "message": "No countries are currently configured as restricted under DPDP \u00a716; restriction-based cross-border findings are not being generated from this dataset."
+    },
+    {
+      "finding_id": "5825ae80-d04d-417a-bc1f-4dcc29724e84",
       "status": "OPEN",
       "category": "security",
       "severity": "medium",
       "priority": "P2",
-      "title": "GDPR: excessive-pii-fields",
-      "file": "src/App.jsx",
-      "rule_id": "excessive-pii-fields",
+      "title": "CRA Vulnerability Disclosure Policy & Contact (SECURITY.md)",
+      "file": null,
+      "rule_id": "cra-security-md-disclosure",
       "detected_by": [
-        "data-flow-extractor"
+        "cra-engine"
       ],
       "merge_blocking": true,
-      "line": 9,
-      "gdpr_references": [
-        "Art. 5(1)(c)"
-      ],
-      "message": "Detected GDPR-relevant technical evidence: email",
-      "code_context": "export default function App() {\n    const userModel = {\n        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n"
+      "message": "No SECURITY.md file detected. CRA Annex I Part II (CRA-II-4, CRA-II-5, CRA-II-6) requires a vulnerability disclosure policy, reporting contact, and advisory process. (Shared with CERT-In security contact requirement)."
     },
     {
-      "finding_id": "a7b2d5cf-702f-40d3-ab3b-dab63cd776a6",
-      "status": "OPEN",
-      "category": "security",
-      "severity": "medium",
-      "priority": "P2",
-      "title": "GDPR: excessive-pii-fields",
-      "file": "src/App.jsx",
-      "rule_id": "excessive-pii-fields",
-      "detected_by": [
-        "data-flow-extractor"
-      ],
-      "merge_blocking": true,
-      "line": 10,
-      "gdpr_references": [
-        "Art. 5(1)(c)"
-      ],
-      "message": "Detected GDPR-relevant technical evidence: password",
-      "code_context": "    const userModel = {\n        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n    };\n"
-    },
-    {
-      "finding_id": "237ac4e5-aadf-4311-bb26-ddf866276e8d",
-      "status": "OPEN",
-      "category": "security",
-      "severity": "medium",
-      "priority": "P2",
-      "title": "GDPR: excessive-pii-fields",
-      "file": "src/App.jsx",
-      "rule_id": "excessive-pii-fields",
-      "detected_by": [
-        "data-flow-extractor"
-      ],
-      "merge_blocking": true,
-      "line": 11,
-      "gdpr_references": [
-        "Art. 5(1)(c)"
-      ],
-      "message": "Detected GDPR-relevant technical evidence: credit_card",
-      "code_context": "        email: \"test@example.com\",\n        password: \"[REDACTED_SECRET]\",\n        credit_card: \"41111111111111\"\n    };\n\n"
-    },
-    {
-      "finding_id": "6a73ece1-a637-4538-b51e-af9819366ce3",
-      "status": "OPEN",
-      "category": "security",
-      "severity": "medium",
-      "priority": "P2",
-      "title": "GDPR: consent-checkbox-default",
-      "file": "src/App.jsx",
-      "rule_id": "consent-checkbox-default",
-      "detected_by": [
-        "data-flow-extractor"
-      ],
-      "merge_blocking": true,
-      "line": 22,
-      "gdpr_references": [
-        "Art. 7"
-      ],
-      "message": "Detected GDPR-relevant technical evidence: defaultChecked_checkbox",
-      "code_context": "        <div>\n            <h1>GDPR Test</h1>\n            <input type=\"checkbox\" defaultChecked={true} />\n        </div>\n    );\n"
-    },
-    {
-      "finding_id": "c4fc3c17-5cec-42c4-8baa-58f6ef8ce3b3",
+      "finding_id": "4801befb-43e9-4775-bca1-6be96ece3ccd",
       "status": "OPEN",
       "category": "architecture",
       "severity": "info",
       "priority": "P3",
-      "title": "GDPR: missing-export-endpoint",
-      "file": "general",
-      "rule_id": "missing-export-endpoint",
+      "title": "CRA-I-3h Vulnerability Update Delivery Mechanism",
+      "file": null,
+      "rule_id": "cra-i-3h-update-delivery",
       "detected_by": [
-        "data-flow-extractor"
+        "cra-engine"
       ],
       "merge_blocking": false,
-      "gdpr_references": [
-        "Art. 15"
+      "message": "No automated release or container publishing workflow identified in repository context."
+    },
+    {
+      "finding_id": "addf340f-1cd7-4533-94fd-0508006b41ce",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CRA-I-3e Availability & DoS Resilience Checklist",
+      "file": null,
+      "rule_id": "cra-i-3e-availability-dos-attestation",
+      "detected_by": [
+        "cra-engine"
       ],
-      "message": "Technical evidence not detected: No explicit data portability/export endpoint found."
+      "merge_blocking": false,
+      "message": "Availability & DoS resilience testing cannot be established from application source code alone. Organizational attestation and test documentation required."
+    },
+    {
+      "finding_id": "906b0387-7719-4a55-9bd5-5e3eace4bd23",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CRA-II-7 Free Security Patch Distribution Checklist",
+      "file": null,
+      "rule_id": "cra-ii-7-free-patch-distribution-attestation",
+      "detected_by": [
+        "cra-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Organizational policy must ensure security updates are provided to end users free of charge and accompanied by advisory information."
+    },
+    {
+      "finding_id": "aa451635-26c3-44ff-8b55-3761d8d9f9c6",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CRA-II-8 ENISA/CSIRT 24-Hour Reporting Checklist",
+      "file": null,
+      "rule_id": "cra-ii-8-enisa-csirt-early-warning-attestation",
+      "detected_by": [
+        "cra-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Process and named incident owner must exist to notify ENISA and designated CSIRT within 24 hours of becoming aware of actively exploited vulnerabilities."
+    },
+    {
+      "finding_id": "0023d4b0-0967-46db-ab8a-429d7c540424",
+      "status": "OPEN",
+      "category": "architecture",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CERT-In \u00a75(v) Log Retention (180 Days) & Data Residency",
+      "file": "src/compliance/cert_in_engine.py",
+      "rule_id": "cert-in-5v-log-retention-residency",
+      "detected_by": [
+        "cert-in-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "Repository configuration evidence detected (Indian cloud region reference ('ap-south-1') and 180-day log retention setting in 'src/compliance/cert_in_engine.py'). Note: Configuration is evidence of configured retention/residency, NOT proof that production CERT-In logs are actually retained for 180 days or stored in India.",
+      "code_context": "\"\"\"\nIndia CERT-In (Cyber Security Directions under Section 70B(6) IT Act, 2000) Engine.\nEvaluates repository evidence against CERT-In statutory requirements and Annexure I incident categories.\n"
+    },
+    {
+      "finding_id": "6f19a0ab-5be0-475c-abc9-8ce78560e085",
+      "status": "OPEN",
+      "category": "architecture",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CERT-In \u00a75(i) NTP Time Synchronization Configuration",
+      "file": "src/compliance/cert_in_engine.py",
+      "rule_id": "cert-in-5i-ntp-synchronization",
+      "detected_by": [
+        "cert-in-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "NTP configuration signal ('nplindia.org') found in 'src/compliance/cert_in_engine.py'. Note: Repository configuration is evidence of configured time sync only; operational confirmation of active NPL/NIC clock synchronization in production is required.",
+      "code_context": "\"\"\"\nIndia CERT-In (Cyber Security Directions under Section 70B(6) IT Act, 2000) Engine.\nEvaluates repository evidence against CERT-In statutory requirements and Annexure I incident categories.\n"
+    },
+    {
+      "finding_id": "1c2a4ce4-897a-44a3-bb1e-cf3cf7713178",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CERT-In \u00a75(iii) 6-Hour Incident Reporting SLA Checklist",
+      "file": null,
+      "rule_id": "cert-in-5iii-6h-incident-reporting-attestation",
+      "detected_by": [
+        "cert-in-engine"
+      ],
+      "merge_blocking": false,
+      "message": "6-hour mandatory cyber incident reporting SLA requires named incident response owners and escalation procedures. Cannot be verified from application source code alone."
+    },
+    {
+      "finding_id": "a9401c58-307b-48b5-b836-e6c9ec23976c",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CERT-In \u00a75(v) Production Log Retention Attestation",
+      "file": null,
+      "rule_id": "cert-in-5v-production-log-retention-attestation",
+      "detected_by": [
+        "cert-in-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Static repository evidence cannot verify active 180-day log rotation or production storage jurisdiction. Operational attestation required."
+    },
+    {
+      "finding_id": "1e4af816-5a52-4957-8ec9-af91f1024de8",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "CERT-In \u00a75(i) Production NTP Time Sync Attestation",
+      "file": null,
+      "rule_id": "cert-in-5i-production-ntp-execution-attestation",
+      "detected_by": [
+        "cert-in-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Active system clock synchronization with NPL/NIC traceable time servers must be operationally verified in production."
+    },
+    {
+      "finding_id": "690cbfe5-c7de-46cf-8070-51c32ef33108",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 5(1) Prior Consent Attestation Checklist",
+      "file": null,
+      "rule_id": "spdi-rule5-1-consent-attestation",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "message": "No explicit consent UI element detected in codebase. Legal/organizational verification is required to confirm prior consent is obtained via offline/external channels."
+    },
+    {
+      "finding_id": "e4d1fa67-5879-46e2-947e-69f898896758",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 5(6) \u2014 Review and Correction Right",
+      "file": null,
+      "rule_id": "spdi-rule5-6-correction-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Profile update / data correction features detected in source code, supporting Rule 5(6) data principal review rights."
+    },
+    {
+      "finding_id": "c2bf6a94-3b49-4b20-8b76-57240b5c09e3",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 5(7) \u2014 Opt-Out and Consent Withdrawal",
+      "file": null,
+      "rule_id": "spdi-rule5-7-optout-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Opt-out / withdrawal features detected in source code, supporting Rule 5(7) rights."
+    },
+    {
+      "finding_id": "c62f36b9-8d54-402d-942f-c6ff88f61b3b",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 4 \u2014 Privacy Policy Publication",
+      "file": "src/compliance/eprivacy_constants.py",
+      "rule_id": "spdi-rule4-privacy-policy-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "Privacy policy file or route artifact detected in repository. SPDI Rule 4 requires publishing a privacy policy covering collection, purpose, disclosure, and security practices.",
+      "code_context": "\"\"\"\nEU ePrivacy Directive (2002/58/EC) Constants.\n\"\"\"\n"
+    },
+    {
+      "finding_id": "e056f329-9209-4cab-81be-21df8f317002",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 8 \u2014 Reasonable Security Practices and Procedures (ISO 27001 / ISMS)",
+      "file": "report.json",
+      "rule_id": "spdi-rule8-isms-documentation-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "Documentation referencing ISO/IEC 27001 standard reference and ISMS / security policy documentation detected in repository. Under SPDI Rule 8, implementing ISO/IEC 27001 or equivalent code of practice complies with reasonable security standards.",
+      "code_context": "{\n  \"repo\": \"../dakiya.apnimandi.us\",\n  \"timestamp\": \"2026-09-17T10:48:33.557344+00:00\",\n"
+    },
+    {
+      "finding_id": "ad366293-4919-4ff8-8910-f53a7a357e6b",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 7 / Rule 5(4) Retention & Cleanup Mechanism",
+      "file": "scratch/without_findings/report.json",
+      "rule_id": "spdi-rule7-retention-deletion-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "Technical indicators for automated data lifecycle / TTL retention configuration and explicit data deletion API endpoint detected in codebase, supporting Rule 5(4) retention limits and Rule 7 lifecycle handling.",
+      "code_context": "{\n  \"repo\": \"Heydo-Tech/dakiya.apnimandi.us\",\n  \"timestamp\": \"2026-09-09T16:01:04.936997+00:00\",\n"
+    },
+    {
+      "finding_id": "2c28cb78-a6f3-4dfa-9d51-868da111602d",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 5(9) \u2014 Grievance Officer Designation",
+      "file": "ai_input.json",
+      "rule_id": "spdi-rule5-9-grievance-officer-detected",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "line": 1,
+      "message": "Grievance contact / privacy officer information detected in repository, supporting Rule 5(9) grievance redressal requirement.",
+      "code_context": "{\n  \"repository\": \"../dakiya.apnimandi.us\",\n  \"analysis_timestamp\": \"2026-09-15T15:24:36.252364+00:00\",\n"
+    },
+    {
+      "finding_id": "721326c2-e4f7-4e6b-874a-0a30b181954e",
+      "status": "OPEN",
+      "category": "security",
+      "severity": "info",
+      "priority": "P3",
+      "title": "SPDI Rule 8 Independent Security Audit Checklist",
+      "file": null,
+      "rule_id": "spdi-rule8-annual-audit-attestation",
+      "detected_by": [
+        "spdi-engine"
+      ],
+      "merge_blocking": false,
+      "message": "Body corporate must have its reasonable security practices & procedures audited by an independent auditor at least once a year or upon significant upgrade."
+    },
+    {
+      "finding_id": "5477a613-16fd-4e5a-81f8-7efd7657cce4",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "TCPA \u00a7 227(b)(1)(A) \u2014 Prior Express / Written Consent",
+      "file": null,
+      "rule_id": "TCPA-227-B-1-A-CALLS-CONSENT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Technical evidence of telephony APIs or phone number data structures detected in repository."
+    },
+    {
+      "finding_id": "fb6cb743-1d00-4761-931f-b5242bc262ce",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "TCPA \u00a7 227(b)(1)(A) \u2014 Prior Express / Written Consent",
+      "file": null,
+      "rule_id": "TCPA-227-B-1-A-CALLS-CONSENT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Codebase contains references to phone or SMS consent flags."
+    },
+    {
+      "finding_id": "c51661df-d323-479a-b9c8-d566a7cfdce3",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "47 C.F.R. \u00a7 64.1200 \u2014 SMS Opt-Out & Keywords Handling (STOP)",
+      "file": null,
+      "rule_id": "TCPA-64-1200-SMS-OPT-OUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Codebase includes keyword inspection logic or webhook handling for SMS opt-out requests."
+    },
+    {
+      "finding_id": "9e2c164d-8004-4778-98ae-d1fc33b5e3a3",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "47 C.F.R. \u00a7 64.1200(d) \u2014 Internal Contact Suppression & Exclusion Lists",
+      "file": null,
+      "rule_id": "TCPA-SUPPRESSION-LIST",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Codebase contains data structures or models for maintaining contact suppression lists."
+    },
+    {
+      "finding_id": "e829c264-beda-44fd-b261-f3d6edac32f3",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "TCPA \u00a7 227(a)(1) \u2014 Autodialer / Automated Dispatch Control",
+      "file": null,
+      "rule_id": "TCPA-AUTODIALER-ATDS-MONITOR",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Technical evidence of batch or automated queue-based communication dispatch detected."
+    },
+    {
+      "finding_id": "aad8b519-6912-448a-a8a0-eb969312e86d",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "TCPA \u00a7 227(b)(1)(B) \u2014 Prerecorded / Artificial Voice Controls",
+      "file": null,
+      "rule_id": "TCPA-227-B-1-B-PRERECORDED-VOICE",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Codebase contains references to voice calling APIs, interactive voice response (IVR), or speech synthesis."
+    },
+    {
+      "finding_id": "3d025a29-174d-4fe8-ad41-2ccce6ad22c7",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "low",
+      "priority": "P3",
+      "title": "TCPA \u00a7 227(c) \u2014 Do-Not-Call (DNC) Registry & Internal DNC Policy",
+      "file": null,
+      "rule_id": "TCPA-227-C-DO-NOT-CALL",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "TCPA compliance requires subscribing to the National Do Not Call Registry and maintaining written DNC procedures."
+    },
+    {
+      "finding_id": "628a610c-c5c5-440e-9d8e-3f973d4e54ef",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "low",
+      "priority": "P3",
+      "title": "47 C.F.R. \u00a7 64.1200(b) \u2014 Identification & Disclosure Requirements",
+      "file": null,
+      "rule_id": "TCPA-64-1200-IDENTIFICATION",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "47 C.F.R. \u00a7 64.1200(b) mandates caller identification disclosures in telephone solicitations and promotional SMS."
+    },
+    {
+      "finding_id": "cc99d869-01d6-4068-8243-4fd9dcd0150c",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "TRAI-TCCCPR-REG-PE-ID",
+      "file": "analyze_repo.py",
+      "rule_id": "TRAI-TCCCPR-REG-PE-ID",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 Principal Entity (PE) DLT Registration Evidence: No PE ID parameter or configuration detected in messaging code."
+    },
+    {
+      "finding_id": "9f1f6b73-b73c-4827-9a67-039b0118e422",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "low",
+      "priority": "P3",
+      "title": "TRAI-TCCCPR-REG-HEADER-ID",
+      "file": "analyze_repo.py",
+      "rule_id": "TRAI-TCCCPR-REG-HEADER-ID",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 Sender Header / Header ID DLT Binding Evidence: Header ID parameter binding not explicitly detected in code."
+    },
+    {
+      "finding_id": "c0fc61c3-fdd5-4279-848b-af2ba5837330",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "TRAI-TCCCPR-REG-TEMPLATE-ID",
+      "file": "analyze_repo.py",
+      "rule_id": "TRAI-TCCCPR-REG-TEMPLATE-ID",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 Content Template ID DLT Registration Evidence: DLT Content Template ID parameter missing from SMS payload dispatch."
+    },
+    {
+      "finding_id": "9cfb194e-d73a-4603-9bf5-e06fdab600db",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "TRAI-TCCCPR-PROMOTIONAL-TIMING",
+      "file": "analyze_repo.py",
+      "rule_id": "TRAI-TCCCPR-PROMOTIONAL-TIMING",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 Promotional Communication Time Restrictions (09:00 to 21:00): Promotional communication flow detected requiring 09:00 to 21:00 dispatch window enforcement."
+    },
+    {
+      "finding_id": "f4c99a01-e5be-4460-83d9-d7482a0574a2",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "medium",
+      "priority": "P2",
+      "title": "TRAI-TCCCPR-PREFERENCE-DND",
+      "file": "analyze_repo.py",
+      "rule_id": "TRAI-TCCCPR-PREFERENCE-DND",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 National Customer Preference Register (NCPR / DND) Scrubbing Evidence: Promotional communication flow requires National Customer Preference Register (NCPR / DND) preference scrubbing."
+    },
+    {
+      "finding_id": "e82ce110-79e8-4e28-9796-4923c1366139",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "low",
+      "priority": "P3",
+      "title": "TRAI-TCCCPR-CONSENT-TELECOM-SCRUB",
+      "file": null,
+      "rule_id": "TRAI-TCCCPR-CONSENT-TELECOM-SCRUB",
+      "detected_by": [
+        "repo-orchestrator-trai-dlt-engine"
+      ],
+      "merge_blocking": false,
+      "message": "TCCCPR 2018 \u2014 Customer Consent Acquisition & DLT Consent Ledger Attestation: DLT Consent Ledger & Opt-in Verification Attestation Required."
+    },
+    {
+      "finding_id": "1eaf294e-f08d-4c7c-8f4a-53e3cf1a7213",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 5: Confidentiality of Communications",
+      "file": null,
+      "rule_id": "EPRIVACY-ART5-CONFIDENTIALITY-ATTESTATION",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Ensure all electronic communications and traffic data are protected from unauthorized access or interception."
+    },
+    {
+      "finding_id": "d06ed1b4-a14c-4544-92ba-166b5148d16e",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 12: Directories of Subscribers",
+      "file": null,
+      "rule_id": "EPRIVACY-ART12-PUBLIC-DIRECTORIES",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Codebase contains references to user directories which may be publicly accessible."
+    },
+    {
+      "finding_id": "2aec56b3-2761-4862-8a9e-7bf2fdeba475",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "analyze_repo.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "VOICE_CALL communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "b5de43e7-c67a-4c59-a17c-363381c2f7fb",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "analyze_repo.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for VOICE_CALL communications."
+    },
+    {
+      "finding_id": "fdaf38c6-2066-431d-925d-df44418a81be",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "analyze_repo.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "SMS communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "b55c63d1-c185-4fac-ae47-922e037ced24",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "analyze_repo.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for SMS communications."
+    },
+    {
+      "finding_id": "e91d37ba-4e27-44d1-9c1e-f87c69635440",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "classify_findings.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "EMAIL communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "48444575-3394-4b89-a8d3-4c67333d7e3c",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "classify_findings.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for EMAIL communications."
+    },
+    {
+      "finding_id": "e2b170d0-68f3-46f6-9f43-2dd1ddaf8728",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "make_patch.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "SMS communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "f6e57b81-ea0e-44f4-92ae-0bf7abf96611",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "make_patch.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for SMS communications."
+    },
+    {
+      "finding_id": "6119da62-6827-412f-8b09-50f1e5a29a58",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "make_patch.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "EMAIL communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "c709b1c5-2c2f-4a68-aa7b-dfd69c0ce864",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "make_patch.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for EMAIL communications."
+    },
+    {
+      "finding_id": "21e731a9-fa90-4d8c-aac5-f0d92b4e5081",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "patch_ast.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "VOICE_CALL communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "8ce45e30-6308-4bc2-bbd3-4b31a3133d29",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "patch_ast.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for VOICE_CALL communications."
+    },
+    {
+      "finding_id": "2949dcaa-4787-4aaa-945f-484658eef186",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "src\\compliance\\cert_in_mapping.py",
+      "rule_id": "EPRIVACY-ART13-MIXED-UNKNOWN",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "EMAIL communication detected with MIXED purpose. Unresolved legal question regarding Article 13 applicability."
+    },
+    {
+      "finding_id": "feed29ad-512b-40fc-82ac-6b70d23e02d3",
+      "status": "OPEN",
+      "category": "privacy",
+      "severity": "info",
+      "priority": "P3",
+      "title": "ePrivacy Art. 13: Unsolicited Communications (Direct Marketing)",
+      "file": "src\\compliance\\cert_in_mapping.py",
+      "rule_id": "EPRIVACY-ART13-OPTOUT",
+      "detected_by": [],
+      "merge_blocking": false,
+      "message": "Evidence of unsubscribe or suppression lists found for EMAIL communications."
     }
   ],
   "data_flow": {
-    "outbound_domains": [
-      "https://api.thirdparty.com/data",
-      "https://analytics.thirdparty.com/track"
-    ],
+    "outbound_domains": [],
     "api_endpoints": [
       {
-        "method": "POST",
-        "route": "/api/users",
-        "line": 28,
-        "file": "src/App.jsx"
+        "method": "GET",
+        "route": "/",
+        "line": 5,
+        "file": "tests/fixtures/js_project/index.ts"
       }
     ],
-    "pii_fields": [
-      {
-        "field": "email",
-        "line": 9,
-        "file": "src/App.jsx"
-      },
-      {
-        "field": "password",
-        "line": 10,
-        "file": "src/App.jsx"
-      },
-      {
-        "field": "credit_card",
-        "line": 11,
-        "file": "src/App.jsx"
-      },
-      {
-        "field": "defaultChecked_checkbox",
-        "line": 22,
-        "file": "src/App.jsx"
-      }
-    ],
+    "pii_fields": [],
     "db_destinations": [],
-    "dependencies": []
+    "dependencies": [],
+    "unused_pii_fields": [],
+    "third_party_transfers": [],
+    "unprotected_storage": []
   }
 }

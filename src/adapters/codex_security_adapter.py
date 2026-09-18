@@ -19,7 +19,7 @@ class CodexSecurityAdapter(BaseAdapter):
     def run(self, repo_path: str) -> ToolResult:
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
-            return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message="OPENAI_API_KEY not set")
+            return ToolResult(tool=self.tool_name, status=ToolStatus.SKIPPED, findings=[], error_message="OPENAI_API_KEY not configured")
             
         codex_home = os.environ.get("CODEX_HOME", os.path.expanduser("~/.codex"))
         scan_state_dir = os.path.join(codex_home, "state", "plugins", "codex-security", "scans")
