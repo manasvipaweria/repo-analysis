@@ -66,12 +66,11 @@ class GitHubClient:
                 raise e
         raise Exception("Max retries exceeded")
 
-    def get_repos(self, org, is_user=False):
+    def get_repos_list(self, prefix, entity):
         repos = []
         page = 1
-        prefix = "orgs"
         while True:
-            res = self._request("GET", f"/{prefix}/{org}/repos?per_page=100&page={page}")
+            res = self._request("GET", f"/{prefix}/{entity}/repos?per_page=100&page={page}")
             if res is None:
                 break
             if not res:
@@ -83,6 +82,12 @@ class GitHubClient:
                 break
             page += 1
         return repos
+
+    def get_repo(self, repo_full_name):
+        res = self._request("GET", f"/repos/{repo_full_name}")
+        if res and not res.get("archived"):
+            return res
+        return None
 
     def get_file_content(self, repo_full_name, path):
         res = self._request("GET", f"/repos/{repo_full_name}/contents/{path}")
@@ -127,9 +132,17 @@ class GitHubClient:
         })
 
 def main():
-    parser = argparse.ArgumentParser(description="Organization Repository Onboarding")
-    parser.add_argument("--org", required=True, help="GitHub Organization or User")
-    parser.add_argument("--repo", help="Target a single repository (e.g. repo-name)")
+    parser = argparse.ArgumentParser(
+        description="Repository Onboarding",
+        epilog="Examples:\n"
+               "  python onboard_org.py --org Heydo-Tech\n"
+               "  python onboard_org.py --owner manasvipaweria\n"
+               "  python onboard_org.py --repo manasvipaweria/Steady",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--org", help="Target an entire GitHub Organization")
+    parser.add_argument("--owner", help="Target a GitHub personal account/user")
+    parser.add_argument("--repo", help="Target a specific repository (e.g. owner/repo)")
     parser.add_argument("--dry-run", action="store_true", help="Do not make any changes")
     parser.add_argument("--limit", type=int, help="Maximum number of PRs to create")
     parser.add_argument("--check-drift", action="store_true", help="Only check for drift, do not create PRs unless --fix-drift is set")
@@ -138,6 +151,9 @@ def main():
     
     args = parser.parse_args()
     
+    if not (args.org or args.owner or args.repo):
+        parser.error("At least one target (--org, --owner, or --repo) must be specified.")
+    
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         print("Error: GITHUB_TOKEN environment variable is not set.")
@@ -145,20 +161,35 @@ def main():
         
     client = GitHubClient(token)
     
-    print(f"[*] Discovering repositories for {args.org}...")
+    target_repos = {}
     try:
-        all_repos = client.get_repos(args.org)
+        if args.org:
+            print(f"[*] Target: organization {args.org}")
+            for r in client.get_repos_list("orgs", args.org):
+                target_repos[r["full_name"]] = r
+                
+        if args.owner:
+            print(f"[*] Target: user {args.owner}")
+            for r in client.get_repos_list("users", args.owner):
+                target_repos[r["full_name"]] = r
+                
+        if args.repo:
+            print(f"[*] Target: repository {args.repo}")
+            r = client.get_repo(args.repo)
+            if r:
+                target_repos[r["full_name"]] = r
+            else:
+                print(f"Repository {args.repo} not found or is archived.")
+                if not target_repos:
+                    sys.exit(1)
     except Exception as e:
         print(f"Error fetching repositories: {e}")
         sys.exit(1)
         
-    if args.repo:
-        repos = [r for r in all_repos if r["name"] == args.repo]
-        if not repos:
-            print(f"Repository {args.repo} not found or is archived.")
-            sys.exit(1)
-    else:
-        repos = all_repos
+    repos = list(target_repos.values())
+    if not repos:
+        print("No active repositories found to process.")
+        sys.exit(1)
         
     print(f"[*] Found {len(repos)} active repositories.")
     
@@ -179,7 +210,11 @@ def main():
     
     for r in repos:
         repo_name = r["full_name"]
-        default_branch = r["default_branch"]
+        default_branch = r.get("default_branch")
+        if not default_branch:
+            print(f"[FAILED] {repo_name}: Missing default branch")
+            stats["FAILED"] += 1
+            continue
         
         try:
             content, sha = client.get_file_content(repo_name, TEMPLATE_PATH)
@@ -244,7 +279,6 @@ def main():
             stats["FAILED"] += 1
             
     print("\n=== Repo Analysis Organization Onboarding ===")
-    print(f"Organization: {args.org}")
     print(f"Repositories discovered: {len(repos)}\n")
     print(f"UP_TO_DATE:       {stats['UP_TO_DATE']}")
     print(f"NEEDS_ONBOARDING: {stats['NEEDS_ONBOARDING']}")
