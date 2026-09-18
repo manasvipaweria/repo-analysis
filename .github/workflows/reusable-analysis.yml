@@ -8,71 +8,110 @@ on:
         required: false
         type: string
         default: 'ruff,bandit,semgrep,pip-audit,mypy,pytest,import-linter,snyk,dep-scan,dependency-cruiser,sonarqube,react-doctor,apnimandi-design'
+
       enable_codex:
         description: 'Enable OpenAI Codex Security and Codex Architecture scanners'
         required: false
         type: boolean
         default: true
+
       enable_design_ai:
-        description: 'Enable AI Semantic Design Checks for frontend repos'
+        description: 'Enable AI Semantic Design Checks'
         required: false
         type: boolean
         default: true
+
       enable_deslint:
         description: 'Enable Deslint React UI Consistency analysis'
         required: false
         type: boolean
         default: true
+
       orchestrator_ref:
         description: 'Branch or tag of the orchestrator repository to use'
         required: false
         type: string
         default: 'main'
+
     secrets:
       GEMINI_API_KEY:
         description: 'Gemini API Key'
         required: false
+
       OPENAI_API_KEY:
         description: 'OpenAI API Key for Codex scanners'
         required: false
+
       SNYK_TOKEN:
         description: 'Snyk API Token'
         required: false
 
 jobs:
   analyze:
+    name: Run Repository Analysis
     runs-on: ubuntu-latest
-    
+
     steps:
+
+      # =========================================================
+      # Checkout target repository
+      # =========================================================
+
       - name: Checkout target repository
         uses: actions/checkout@v4
         with:
           path: target-repo
-          
+
+      # =========================================================
+      # Checkout central orchestrator
+      # =========================================================
+
       - name: Checkout orchestrator repository
         uses: actions/checkout@v4
         with:
           repository: manasvipaweria/repo-analysis
           ref: ${{ inputs.orchestrator_ref }}
           path: orchestrator-repo
-          
+
+      # =========================================================
+      # Runtime setup
+      # =========================================================
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
+          cache: pip
+          cache-dependency-path: orchestrator-repo/requirements.txt
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
+      # =========================================================
+      # Install analysis dependencies
+      # =========================================================
+
       - name: Install orchestrator and CLI dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r orchestrator-repo/requirements.txt
-          pip install owasp-depscan
-          npm install -g snyk @cyclonedx/cdxgen dependency-cruiser react-doctor eslint @deslint/eslint-plugin
+
+          pip install \
+            -r orchestrator-repo/requirements.txt \
+            owasp-depscan
+
+          npm install -g \
+            snyk \
+            @cyclonedx/cdxgen \
+            dependency-cruiser \
+            react-doctor \
+            eslint \
+            @deslint/eslint-plugin
+
+      # =========================================================
+      # Cache dependency scanner database
+      # =========================================================
 
       - name: Cache dep-scan VDB
         uses: actions/cache@v4
@@ -88,94 +127,211 @@ jobs:
         run: |
           depscan-vdb download --scope app
 
-      - name: Verify CLI Tools
+      # =========================================================
+      # Verify CLI tools
+      # =========================================================
+
+      - name: Verify CLI tools
         env:
           VDB_HOME: ${{ github.workspace }}/.vdb
         run: |
-          depscan --version || exit 1
-          depscan-vdb path || exit 1
-          cdxgen --version || exit 1
+          depscan --version
+          depscan-vdb path
+          cdxgen --version
+          eslint --version
+          node --version
+          npm --version
 
-      - name: Ensure Codex state directory
+      # =========================================================
+      # Prepare Codex state
+      # =========================================================
+
+      - name: Prepare Codex state directory
+        if: ${{ inputs.enable_codex }}
         run: |
           mkdir -p "$HOME/.codex/state/plugins/codex-security/scans"
           chmod -R 700 "$HOME/.codex"
 
-      - name: Install target repository frontend dependencies
+      # =========================================================
+      # Detect frontend / Node project
+      # =========================================================
+
+      - name: Detect frontend project
+        id: frontend
+        shell: bash
         run: |
-          if [ -d "target-repo/frontend" ] && [ -f "target-repo/frontend/package.json" ]; then
-            echo "Installing frontend dependencies in target-repo/frontend..."
-            cd target-repo/frontend
-            NODE_ENV=development npm install --include=dev --no-fund --no-audit
-            NODE_ENV=development npm install @deslint/eslint-plugin eslint --no-save --no-fund --no-audit
-          elif [ -f "target-repo/package.json" ]; then
-            echo "Installing dependencies in target-repo root..."
-            cd target-repo
-            NODE_ENV=development npm install --include=dev --no-fund --no-audit
-            NODE_ENV=development npm install @deslint/eslint-plugin eslint --no-save --no-fund --no-audit
+          if [ -f "target-repo/package.json" ]; then
+            echo "project_dir=target-repo" >> "$GITHUB_OUTPUT"
+            echo "Found root package.json"
+
+          elif [ -f "target-repo/frontend/package.json" ]; then
+            echo "project_dir=target-repo/frontend" >> "$GITHUB_OUTPUT"
+            echo "Found frontend/package.json"
+
+          else
+            echo "project_dir=" >> "$GITHUB_OUTPUT"
+            echo "No supported package.json found"
           fi
 
-      - name: Verify Deslint dependency resolution
+      # =========================================================
+      # Install target repository dependencies
+      #
+      # --no-save prevents package.json/package-lock.json changes.
+      # =========================================================
+
+      - name: Install frontend dependencies
+        if: ${{ steps.frontend.outputs.project_dir != '' }}
+        shell: bash
         run: |
-          if [ -d "target-repo/frontend" ] && [ -f "target-repo/frontend/package.json" ]; then
-            echo "Verifying Deslint package installation in target-repo/frontend..."
-            cd target-repo/frontend
-            if [ -d "node_modules/@deslint/eslint-plugin" ]; then
-              echo "Found @deslint/eslint-plugin in target-repo/frontend/node_modules."
-            else
-              echo "WARNING: @deslint/eslint-plugin not found in target-repo/frontend/node_modules."
-            fi
-            npm list @deslint/eslint-plugin --depth=0 || true
-            node -e "import('file://' + process.cwd() + '/node_modules/@deslint/eslint-plugin/dist/index.js').then(() => console.log('ESM resolution of @deslint/eslint-plugin succeeded.')).catch(e => console.error('ESM resolution error:', e.message))" || true
+          cd "${{ steps.frontend.outputs.project_dir }}"
+
+          echo "Installing dependencies in:"
+          pwd
+
+          NODE_ENV=development npm install \
+            --include=dev \
+            --no-save \
+            --no-fund \
+            --no-audit
+
+          NODE_ENV=development npm install \
+            @deslint/eslint-plugin \
+            eslint \
+            --no-save \
+            --no-fund \
+            --no-audit
+
+      # =========================================================
+      # Verify Deslint
+      # =========================================================
+
+      - name: Verify Deslint
+        if: ${{ inputs.enable_deslint && steps.frontend.outputs.project_dir != '' }}
+        shell: bash
+        run: |
+          cd "${{ steps.frontend.outputs.project_dir }}"
+
+          echo "Deslint project directory:"
+          pwd
+
+          if [ -d "node_modules/@deslint/eslint-plugin" ]; then
+            echo "Deslint plugin found."
+          else
+            echo "WARNING: Deslint plugin was not found in local node_modules."
           fi
 
-      - name: Debug Deslint package and npmrc
-        run: |
-          if [ -d "target-repo/frontend" ]; then
-            cd target-repo
-            ls frontend/node_modules/@deslint/ 2>&1 || echo "not found"
-            cat frontend/.npmrc 2>&1 || echo "no npmrc"
-          elif [ -d "target-repo" ]; then
-            cd target-repo
-            ls node_modules/@deslint/ 2>&1 || echo "not found"
-            cat .npmrc 2>&1 || echo "no npmrc"
-          fi
+          npm list @deslint/eslint-plugin --depth=0 || true
+
+      # =========================================================
+      # Run central orchestrator
+      # =========================================================
 
       - name: Run Repo Analysis Orchestrator
         id: analyze
+        shell: bash
+
         env:
+          # -----------------------------------------------------
+          # Optional credentials
+          #
+          # The adapters/orchestrator handle missing credentials
+          # by returning SKIPPED instead of failing the pipeline.
+          # -----------------------------------------------------
+
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+          # -----------------------------------------------------
+          # AI configuration
+          # -----------------------------------------------------
+
           AI_PROVIDER: gemini
           GEMINI_MODEL: gemini-3.5-flash
-          AI_BATCH_SIZE: "5"
-          AI_MAX_OUTPUT_TOKENS: "4000"
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          AI_BATCH_SIZE: '5'
+          AI_MAX_OUTPUT_TOKENS: '4000'
+
+          # -----------------------------------------------------
+          # Dependency scanner configuration
+          # -----------------------------------------------------
+
           VDB_HOME: ${{ github.workspace }}/.vdb
           DEPSCAN_AUTO_DOWNLOAD: 'false'
+
+          # -----------------------------------------------------
+          # Feature flags
+          # -----------------------------------------------------
+
           ENABLE_DESIGN_AI: ${{ inputs.enable_design_ai }}
           ENABLE_DESLINT: ${{ inputs.enable_deslint }}
+
         run: |
           cd target-repo
+
           rm -f report.json report.csv
-          
-          # Construct tools list
+
+          # -----------------------------------------------------
+          # Build tool list
+          # -----------------------------------------------------
+
           TOOLS="${{ inputs.tools }}"
-          if [ "${{ inputs.enable_codex }}" == "true" ]; then
+
+          if [ "${{ inputs.enable_codex }}" = "true" ]; then
             TOOLS="$TOOLS,codex-security,codex-architecture"
           fi
-          if [ "${{ inputs.enable_deslint }}" == "true" ] && [[ "$TOOLS" != *"deslint"* ]]; then
+
+          if [ "${{ inputs.enable_deslint }}" = "true" ] && [[ ",$TOOLS," != *",deslint,"* ]]; then
             TOOLS="$TOOLS,deslint"
           fi
-          
-          python ../orchestrator-repo/analyze_repo.py . --repo-name ${{ github.repository }} --tools $TOOLS --output json,csv --run-ai
-        
+
+          # -----------------------------------------------------
+          # Display configuration
+          # -----------------------------------------------------
+
+          echo "=============================================="
+          echo "Repository Analysis"
+          echo "=============================================="
+          echo "Repository:"
+          echo "${{ github.repository }}"
+          echo ""
+          echo "Orchestrator ref:"
+          echo "${{ inputs.orchestrator_ref }}"
+          echo ""
+          echo "Codex enabled:"
+          echo "${{ inputs.enable_codex }}"
+          echo ""
+          echo "Deslint enabled:"
+          echo "${{ inputs.enable_deslint }}"
+          echo ""
+          echo "Design AI enabled:"
+          echo "${{ inputs.enable_design_ai }}"
+          echo ""
+          echo "Tools:"
+          echo "$TOOLS"
+          echo "=============================================="
+
+          # -----------------------------------------------------
+          # Run analysis
+          # -----------------------------------------------------
+
+          python ../orchestrator-repo/analyze_repo.py \
+            . \
+            --repo-name "${{ github.repository }}" \
+            --tools "$TOOLS" \
+            --output json,csv \
+            --run-ai
+
+      # =========================================================
+      # Upload reports
+      # =========================================================
+
       - name: Upload analysis reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: repo-analysis-report
+          name: repo-analysis-report-${{ github.repository_owner }}-${{ github.event.repository.name }}-${{ github.run_id }}
           path: |
             target-repo/report.json
             target-repo/report.csv
-          if-no-files-found: error
+          if-no-files-found: warn
+          retention-days: 30
